@@ -1,7 +1,8 @@
 # TODO
 # Кнопка Export
 # Параметр размер точки
-# Рисовать границы
+# --- Рисовать границы ---
+# Параметр для ширины границы
 # ? Plot point by point
 
 import numpy as np
@@ -71,10 +72,15 @@ def plot():
     if not params.child('Стартовая точка').value():
         worker.m = worker.generate_m()
 
-    worker.coloring = True
-    worker.vertices_colors = parse_colors(params.child('Цвета точек').value())
-    if not params.child('Цвета точек').value():
+    worker.coloring = False
+    if params.child('Цвета точек').value():
+        worker.coloring = True
+        worker.vertices_colors = parse_colors(params.child('Цвета точек').value())
+
+    if params.child('Случайные цвета').value():
+        worker.coloring = True
         worker.vertices_colors = worker.gen_random_colors()
+
 
     relation = params.child('lambda').value()
     worker.projective = params.child('projective').value()
@@ -82,8 +88,8 @@ def plot():
 
     xmin, xmax, ymin, ymax = parse_limits(params.child('Пределы').value())
     if not params.child('Пределы').value():
-        xmin, xmax, ymin, ymax = worker.guess_limits()
 
+        xmin, xmax, ymin, ymax = worker.guess_limits()
         if params.child('Угадывать пределы (включить абсолют)').value():
             xmin, xmax, ymin, ymax = worker.guess_limits(contains_absolute = True)
 
@@ -92,10 +98,19 @@ def plot():
     canvas.setXRange(xmin, xmax)
     canvas.setYRange(ymin, ymax)
 
+    if params.child('Рисовать границы').value():
+        tmp = [i.to_Point2() for i in worker.vertices]
+
+        for j in range(len(tmp)):
+            x_values = [tmp[j].x, tmp[(j + 1) % len(tmp)].x]
+            y_values = [tmp[j].y, tmp[(j + 1) % len(tmp)].y]
+
+            canvas.plot(x_values, y_values, pen=pg.mkPen('#000000', width=3))
+
     if params.child('Рисовать абсолют').value():
         color = params.child('Цвет абсолюта').value()
 
-        points = np.linspace(0, 2 * math.pi, num=10**3)
+        points = np.linspace(0, 2 * math.pi, num=200)
         circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color))
         canvas.addItem(circle)
 
@@ -114,6 +129,8 @@ def plot():
     main_window.setWindowTitle('pyv DONE')
     busy = False
 
+    del worker
+
 
 pg.setConfigOptions(antialias=True)
 
@@ -127,15 +144,16 @@ main_window.setWindowTitle('pyv')
 
 children = [
     dict(name='Вершины', type='str', value='(2:0:1),(4:2:1),(4:-2:1)'),
-    dict(name='Рисовать границы', type='bool', value=False),
     dict(name='Стартовая точка', type='str', value=''),
     dict(name='Цвета точек', type='str', value='0000ff, 008000, 781f19'),
+    dict(name='Случайные цвета', type='bool', value=False),
     dict(name='lambda', type='float', value='1.0'),
     dict(name='projective', type='float', value='1.0'),
     dict(name='Рисовать вторую середину', type='bool', value=False),
     dict(name='Пределы', type='str', value=''),
     dict(name='Угадывать пределы', type='bool', value=False),
     dict(name='Угадывать пределы (включить абсолют)', type='bool', value=True),
+    dict(name='Рисовать границы', type='bool', value=True),
     dict(name='Рисовать абсолют', type='bool', value=True),
     dict(name='Цвет абсолюта', type='str', value='#ff0000'),
     dict(name='Количество точек', type='str', value='2**14')
@@ -151,7 +169,7 @@ canvas.setAspectLocked(True, 1.0)
 
 win.setBackground('w')
 
-tmp = np.linspace(0, 2 * math.pi, num=10**3)
+tmp = np.linspace(0, 2 * math.pi, num=200)
 circle = pg.PlotCurveItem(np.cos(tmp), np.sin(tmp), pen = pg.mkPen('#ff0000'))
 canvas.addItem(circle)
 
