@@ -10,7 +10,7 @@ class Worker(object):
     def __init__(self):
         from math import inf
 
-        self.m = Point2(0.0, 0.0)
+        self.start_point = Point2(0.0, 0.0)
         self._vertices = list()
         self.checker = self.convex_trick
         self.vertices_colors = list()
@@ -46,6 +46,7 @@ class Worker(object):
 
         return answer
 
+
     # TODO: rewrite using cp algorithm: https://cp-algorithms.com/geometry/point-in-convex-polygon.html
     # very slow
     def convex_trick(self, p: Point2) -> bool:
@@ -53,9 +54,10 @@ class Worker(object):
 
         return Point(p.x, p.y).within(self.poly)
 
+
     # TODO
     # return m instead of setting
-    def generate_m(self) -> Point2:
+    def gen_start_point(self) -> Point2:
         from random import uniform
         from shapely.geometry import Point, Polygon
 
@@ -70,6 +72,7 @@ class Worker(object):
             y = uniform(miny, maxy)
 
         return Point2(x, y)
+
 
     def guess_limits(self, contains_absolute=False) -> (float, float, float, float):
         from math import inf
@@ -104,6 +107,7 @@ class Worker(object):
         ymax += 0.5
 
         return xmin, xmax, ymin, ymax
+
 
     def div_in_rel(self, Ai: Point3, M: Point3, rel=1, inside=True) -> Point2:
         from math import inf, isinf
@@ -151,7 +155,7 @@ class Worker(object):
             colors = np.empty(cnt, dtype='object')
             colors_out = np.empty(cnt, dtype='object')
 
-        cur = self.m
+        cur = self.start_point
 
         for k in range(cnt):
             Ai = choice(self.vertices)
@@ -223,7 +227,7 @@ class Worker(object):
             colors = np.empty(cnt, dtype='object')
             colors_out = np.empty(cnt, dtype='object')
 
-        cur = self.m
+        cur = self.start_point
 
         # prev Ai
         prev = None
@@ -295,7 +299,7 @@ class Worker(object):
             colors = np.empty(cnt, dtype='object')
             colors_out = np.empty(cnt, dtype='object')
 
-        cur = self.m
+        cur = self.start_point
 
         for k in range(cnt):
             Ai = random.choice(self.vertices)
@@ -334,7 +338,7 @@ class Worker(object):
             colors = np.empty(cnt, dtype='object')
             colors_out = np.empty(cnt, dtype='object')
 
-        cur = self.m
+        cur = self.start_point
         prev = None
 
         for k in range(cnt):

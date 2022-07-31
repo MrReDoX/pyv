@@ -1,12 +1,9 @@
 # TODO
-# Кнопка Export
-# Запоминать результаты вычислений для ускорения работы
 # Кнопка сохранить текущую конфигурацию
 # Кнопка checker, которая позволяет установить текущий checker
 # Переделать вершины в class pyqtgraph.parametertree.parameterTypes.ListParameter(**opts)[
 # или на class pyqtgraph.parametertree.parameterTypes.TextParameter(**opts)
 # Рисовать точку за точкой?
-# Дерево параметров Export
 # Выбрать формат для экспорта списком: eps, png...
 # dpi для экспорта
 
@@ -83,9 +80,9 @@ def plot():
     worker = Worker()
     worker.vertices = parse_vertices(params.child('Вершины').value())
 
-    worker.m = parse_m(params.child('Стартовая точка').value())
+    worker.start_point = parse_m(params.child('Стартовая точка').value())
     if not params.child('Стартовая точка').value():
-        worker.m = worker.generate_m()
+        worker.start_point = worker.gen_start_point()
 
     worker.coloring = False
     if colors := params.child('Цвета точек').value():
@@ -224,9 +221,16 @@ children = [
     dict(name='Размер точки', type='float', value=1.0)
 ]
 
+children_exp = [
+    dict(name='Формат', type='str', value='png'),
+    dict(name='dpi', type='int', value=600),
+]
+
 params = pg.parametertree.Parameter.create(name='Параметры', type='group', children=children)
+param_exp = pg.parametertree.Parameter.create(name='Экспорт', type='group', children=children_exp)
 param_tree = pg.parametertree.ParameterTree(showHeader=False)
-param_tree.setParameters(params)
+param_tree.addParameters(params)
+param_tree.addParameters(param_exp)
 
 win = pg.GraphicsLayoutWidget(show=False)
 canvas = win.addPlot()
