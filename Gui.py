@@ -1,11 +1,9 @@
 # TODO
-# Кнопка сохранить текущую конфигурацию
-# Кнопка checker, которая позволяет установить текущий checker
-# Переделать вершины в class pyqtgraph.parametertree.parameterTypes.ListParameter(**opts)[
-# или на class pyqtgraph.parametertree.parameterTypes.TextParameter(**opts)
+# export_conf
+# import_conf
+# Кнопка checker в параметрах, которая позволяет установить текущий checker
 # Рисовать точку за точкой?
-# Выбрать формат для экспорта списком: eps, png...
-# dpi для экспорта
+# status bar?
 
 # https://pyqtgraph.readthedocs.io/en/latest/parametertree/parametertypes.html
 
@@ -13,6 +11,7 @@ import numpy as np
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.parametertree import Parameter, ParameterTree
 
 import math
 import threading
@@ -32,9 +31,9 @@ def parse_m(data: str) -> Point2:
 
     return Point2(data[0], data[1])
 
-# format: "(x_1:y_1:z_1),(x_2:y_2:z_2),\dots,(x_n:y_n:z_n)"
+# format: "(x_1:y_1:z_1)\n(x_2:y_2:z_2)\n\dots\n(x_n:y_n:z_n)"
 def parse_vertices(data: str) -> list:
-    data = data.strip().replace(' ', '').split(',')
+    data = data.strip().replace(' ', '').split('\n')
 
     # remove ( and )
     data = [i[1:-1] for i in data]
@@ -147,10 +146,6 @@ def plot():
     main_window.setWindowTitle('pyv DONE')
 
 
-def save():
-    pass
-
-
 def export():
     import matplotlib.pyplot as plt
 
@@ -166,7 +161,7 @@ def export():
     plt.xlim(worker.xmin, worker.xmax)
     plt.ylim(worker.ymin, worker.ymax)
 
-    if params.child('Рисовать границы').value():
+    if params_exp.child('Рисовать границы').value():
         width = 1.0
         # if value := params.child('Ширина границ').value():
         #     width = value / 2
@@ -182,8 +177,20 @@ def export():
     if val := params.child('Размер точки').value():
         size = val
 
+    file_name = 'export'
+    if val := params_exp.child('Имя файла').value():
+        file_name = val
+
+    file_format = 'png'
+    if val := params_exp.child('Формат').value():
+        file_format = val
+
+    dpi = 600
+    if val := params_exp.child('dpi').value():
+        dpi = val
+
     plt.scatter(x, y, c=colors, s=size/2, edgecolors='none')
-    plt.savefig('export.png', dpi=600)
+    plt.savefig(f'{file_name}.{file_format}', dpi=dpi)
 
     plt.close()
     plt.cla()
@@ -191,6 +198,12 @@ def export():
 
     main_window.setWindowTitle('pyv DONE')
 
+
+def export_conf():
+    pass
+
+def import_conf():
+    pass
 
 pg.setConfigOptions(antialias=True)
 
@@ -203,7 +216,8 @@ main_window = QtWidgets.QMainWindow()
 main_window.setWindowTitle('pyv')
 
 children = [
-    dict(name='Вершины', type='str', value='(2:0:1),(4:2:1),(4:-2:1)'),
+    # dict(name='Вершины', type='str', value='(2:0:1),(4:2:1),(4:-2:1)'),
+    Parameter.create(name='Вершины', type='text', value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
     dict(name='Стартовая точка', type='str', value=''),
     dict(name='Цвета точек', type='str', value='0000ff, 008000, 781f19'),
     dict(name='Случайные цвета', type='bool', value=False),
@@ -222,15 +236,16 @@ children = [
 ]
 
 children_exp = [
+    dict(name='Имя файла', type='str', value='export'),
     dict(name='Формат', type='str', value='png'),
-    dict(name='dpi', type='int', value=600),
+    dict(name='dpi', type='int', value=600)
 ]
 
-params = pg.parametertree.Parameter.create(name='Параметры', type='group', children=children)
-param_exp = pg.parametertree.Parameter.create(name='Экспорт', type='group', children=children_exp)
-param_tree = pg.parametertree.ParameterTree(showHeader=False)
+params = Parameter.create(name='Параметры', type='group', children=children)
+params_exp = Parameter.create(name='Экспорт', type='group', children=children_exp)
+param_tree = ParameterTree(showHeader=False)
 param_tree.addParameters(params)
-param_tree.addParameters(param_exp)
+param_tree.addParameters(params_exp)
 
 win = pg.GraphicsLayoutWidget(show=False)
 canvas = win.addPlot()
@@ -242,14 +257,33 @@ tmp = np.linspace(0, 2 * math.pi, num=200)
 circle = pg.PlotCurveItem(np.cos(tmp), np.sin(tmp), pen = pg.mkPen('#ff0000'))
 canvas.addItem(circle)
 
+action_export = QtWidgets.QAction(main_window)
+action_export.setObjectName('actionExport')
+action_export.setText('Экспортировать')
+action_export.triggered.connect(export_conf)
+
+action_import = QtWidgets.QAction(main_window)
+action_import.setObjectName('actionImport')
+action_import.setText('Импортировать')
+action_import.triggered.connect(import_conf)
+
+
+menu = main_window.menuBar()
+conf = menu.addMenu('Конфигурация')
+conf.addAction(action_export)
+conf.addAction(action_import)
+# conf.addAction('Экспортировать')
+# conf.addAction('Импортировать')
+
+
 
 btn_plot = QtWidgets.QPushButton("Plot")
-btn_save = QtWidgets.QPushButton("Save")
+# btn_save = QtWidgets.QPushButton("Save")
 btn_export = QtWidgets.QPushButton("Export")
 
 # connect plot to thread
 btn_plot.clicked.connect(plot)
-btn_save.clicked.connect(save)
+# btn_save.clicked.connect(save)
 btn_export.clicked.connect(export)
 # plot_thread = threading.Thread(target=plot)
 # btn_plot.clicked.connect(plot_thread.start)
@@ -257,12 +291,14 @@ btn_export.clicked.connect(export)
 
 button_layout = QtWidgets.QHBoxLayout()
 button_layout.addWidget(btn_plot)
-button_layout.addWidget(btn_save)
+# button_layout.addWidget(btn_save)
 button_layout.addWidget(btn_export)
+
 
 main_layout = QtWidgets.QVBoxLayout()
 main_layout.addWidget(param_tree)
 main_layout.addLayout(button_layout)
+
 
 widget = QtWidgets.QWidget()
 widget.setLayout(main_layout)
@@ -281,13 +317,17 @@ splitter.addWidget(widget)
 # layout.addWidget(btn_plot, 1, 1)
 # layout.addWidget(btn_reset, 1, 2)
 
+
 main_window.setCentralWidget(splitter)
+
 
 # widget = QtWidgets.QWidget(win)
 # main_window.setCentralWidget(widget)
 # widget.setLayout(splitter)
 
+
 main_window.showMaximized()
+
 
 # layout.showMaximized()
 # layout.show()
