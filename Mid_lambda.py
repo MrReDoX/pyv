@@ -22,26 +22,25 @@ def u3(a: Point3, b: Point3) -> float:
 
 
 def k(a: Point3, b: Point3) -> float:
-    from math import inf
-    from math import isinf
+    from math import inf, isfinite
 
     U1 = u1(a, b)
     U3 = u3(a, b)
 
-    if isinf(U3):
+    if not isfinite(U3):
         return inf
 
     return U1 * U1 - U3 * U3
 
 
 def k1(a: Point3, b: Point3) -> complex:
-    from cmath import inf, isinf, sqrt
+    from cmath import inf, isfinite, sqrt
 
     U1 = u1(a, b)
     U2 = u2(a, b)
     U3 = u3(a, b)
 
-    if isinf(U3):
+    if not isfinite(U3):
         return inf
 
     s1 = -U1 * U2
@@ -51,31 +50,28 @@ def k1(a: Point3, b: Point3) -> complex:
 
 
 def k2(a: Point3, b: Point3) -> complex:
-    from cmath import inf, isinf, sqrt
+    from cmath import inf, isfinite, sqrt
 
     U1 = u1(a, b)
     U2 = u2(a, b)
     U3 = u3(a, b)
 
-    if isinf(U3):
+    if not isfinite(U3):
         return inf
 
     s1 = -U1 * U2
-    s2 = U3 * sqrt(U1 * U1 + U2 * U2 - U3 * U3)
+    s2 = U3 * sqrt(U1**2 + U2**2 - U3**2)
 
     return s1 - s2
 
 
 def omega1(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isinf, exp, log
-    # from math import inf, isinf, pow
+    from cmath import inf, isfinite, exp, log
 
     K1 = k1(a, b)
     K = k(a, b)
 
-    if isinf(K1) or isinf(K):
-        # print(f'---omega1--- k2 = {K1}, k = {K}')
-
+    if not (isfinite(K1) and isfinite(K)):
         return inf
 
     m1 = a.x * K - a.y * K1
@@ -84,23 +80,16 @@ def omega1(a: Point3, b: Point3, coeff: float) -> complex:
     if not m1 * m2:
         return inf
 
-    # if m1 < 0 or m2 < 0:
-    #     print(f'omega1: BAD m1 = {m1} or m2 = {m2}')
-    #     return inf
-
     return m1**(1 / (1 + coeff)) * m2**(coeff / (1 + coeff))
 
 
 def omega2(a: Point3, b: Point3, coeff: float) -> float:
-    from cmath import inf, isinf, exp, log
-    # from math import inf, isinf, pow
+    from cmath import inf, isfinite, exp, log
 
     K2 = k2(a, b)
     K = k(a, b)
 
-    if isinf(K2) or isinf(K):
-        # print(f'---omega2--- k2 = {K2}, k = {K}')
-
+    if not (isfinite(K2) and isfinite(K)):
         return inf
 
     m1 = a.x * K - a.y * K2
@@ -109,14 +98,11 @@ def omega2(a: Point3, b: Point3, coeff: float) -> float:
     if not m1 * m2:
         return inf
 
-    # if m1 < 0 or m2 < 0:
-    #     return inf
-
     return m1**(1 / (1 + coeff)) * m2**(coeff / (1 + coeff))
 
 
 def c1(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isinf
+    from cmath import inf, isfinite
 
     U3 = u3(a, b)
     K1 = k1(a, b)
@@ -125,7 +111,7 @@ def c1(a: Point3, b: Point3, coeff: float) -> complex:
     Omega2 = omega2(a, b, coeff)
 
     vals = [U3, K1, K2, Omega1, Omega2]
-    if any(map(isinf, vals)):
+    if any(map(lambda x: not isfinite(x), vals)):
         return inf
 
     answer = U3 * (K2 * Omega1 - K1 * Omega2)
@@ -134,7 +120,7 @@ def c1(a: Point3, b: Point3, coeff: float) -> complex:
 
 
 def c2(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isinf
+    from cmath import inf, isfinite
 
     U3 = u3(a, b)
     K = k(a, b)
@@ -142,7 +128,7 @@ def c2(a: Point3, b: Point3, coeff: float) -> complex:
     Omega2 = omega2(a, b, coeff)
 
     vals = [U3, K, Omega1, Omega2]
-    if any(map(isinf, vals)):
+    if any(map(lambda x: not isfinite(x), vals)):
         return inf
 
     answer = U3 * K * (Omega1 - Omega2)
@@ -151,7 +137,7 @@ def c2(a: Point3, b: Point3, coeff: float) -> complex:
 
 
 def c3(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isinf
+    from cmath import inf, isfinite
 
     U1 = u1(a, b)
     U2 = u2(a, b)
@@ -162,7 +148,7 @@ def c3(a: Point3, b: Point3, coeff: float) -> complex:
     Omega2 = omega2(a, b, coeff)
 
     vals = [U1, U2, K, K1, K2, Omega1, Omega2]
-    if any(map(isinf, vals)):
+    if any(map(lambda x: not isfinite(x), vals)):
         return inf
 
     s1 = Omega2 * (U1 * K1 + U2 * K)

@@ -1,9 +1,8 @@
 # TODO
-# export_conf
-# import_conf
-# Кнопка checker в параметрах, которая позволяет установить текущий checker
+# Экспортирование дерева "Экспорт"
 # Рисовать точку за точкой?
 # status bar?
+# split files
 
 # https://pyqtgraph.readthedocs.io/en/latest/parametertree/parametertypes.html
 
@@ -44,7 +43,7 @@ def parse_vertices(data: str) -> list:
     return [Point3(x, y, z) for (x, y, z) in data]
 
 
-# format: "HEX1, HEX2, ..., HEX3"
+# format: "#HEX1, #HEX2, ..., #HEX3"
 def parse_colors(data: str) -> list:
     if not data:
         return list()
@@ -52,7 +51,7 @@ def parse_colors(data: str) -> list:
     # remove spaces, etc
     data = data.strip().replace(' ', '').split(',')
 
-    return [f'#{i}' for i in data]
+    return [f'{i}' for i in data]
 
 
 # format: "xmin, xmax, ymin, ymax"
@@ -133,6 +132,17 @@ def plot():
         circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color))
         canvas.addItem(circle)
 
+    if val := params.child('Checker').value():
+        import os
+        import sys
+        from pathlib import Path
+
+        sys.path.append(os.path.dirname(val))
+
+        module = __import__(Path(val).stem)
+
+        worker.checker = module.checker
+
     cnt = eval(params.child('Количество точек').value())
 
     x, y, colors = worker.clean(*worker.work(cnt, rel=relation))
@@ -147,6 +157,7 @@ def plot():
 
 
 def export():
+    import os
     import matplotlib.pyplot as plt
 
     global x, y, colors
@@ -154,14 +165,19 @@ def export():
 
     main_window.setWindowTitle('pyv EXPORTING')
 
-    print(worker.xmin, worker.xmax, worker.ymin, worker.ymax)
-
     plt.gca().set_aspect('equal', adjustable='box')
-    plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color='red'))
+
+    if params.child('Рисовать абсолют').value():
+        color = 'red'
+        if val := params.child('Цвет абсолюта').value():
+            color = val
+
+        plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color=color))
+
     plt.xlim(worker.xmin, worker.xmax)
     plt.ylim(worker.ymin, worker.ymax)
 
-    if params_exp.child('Рисовать границы').value():
+    if params.child('Рисовать границы').value():
         width = 1.0
         # if value := params.child('Ширина границ').value():
         #     width = value / 2
@@ -174,23 +190,26 @@ def export():
             plt.plot(x_values, y_values, c='black', linewidth=width)
 
     size = 1.0
-    if val := params.child('Размер точки').value():
-        size = val
+    # if val := params.child('Размер точки').value():
+    #     size = val
 
-    file_name = 'export'
-    if val := params_exp.child('Имя файла').value():
-        file_name = val
+    path, fmt = QtWidgets.QFileDialog.getSaveFileName(
+        parent=main_window,
+        caption='Выберите файл',
+        directory=os.getcwd(),
+    )
 
-    file_format = 'png'
-    if val := params_exp.child('Формат').value():
-        file_format = val
+    file_name = os.path.basename(path)
+
+    if not file_name:
+        return
 
     dpi = 600
     if val := params_exp.child('dpi').value():
         dpi = val
 
     plt.scatter(x, y, c=colors, s=size/2, edgecolors='none')
-    plt.savefig(f'{file_name}.{file_format}', dpi=dpi)
+    plt.savefig(file_name, dpi=dpi)
 
     plt.close()
     plt.cla()
@@ -200,26 +219,59 @@ def export():
 
 
 def export_conf():
-    pass
+    import json
+    import os
+
+    filt = 'Json File (*.json)'
+    path, fmt = QtWidgets.QFileDialog.getSaveFileName(
+        parent=main_window,
+        caption='Выберите файл',
+        directory=os.getcwd(),
+        filter=filt,
+        initialFilter=filt
+    )
+
+    file_name = os.path.basename(path)
+
+    if not file_name:
+        return
+
+    if path.find('.json') == -1:
+        file_name = file_name + '.json'
+
+    with open(file_name, 'w') as file:
+        json.dump(params.saveState(), file)
+
 
 def import_conf():
-    pass
+    import json
+    import os
+
+    filt = 'Json File (*.json)'
+    path, fmt = QtWidgets.QFileDialog.getOpenFileName(
+        parent=main_window,
+        caption='Выберите файл',
+        directory=os.getcwd(),
+        filter=filt,
+        initialFilter=filt
+    )
+
+    file_name = os.path.basename(path)
+
+    if file_name:
+        params.restoreState(json.load(open(file_name)))
 
 pg.setConfigOptions(antialias=True)
 
 app = pg.mkQApp('pyv')
 
-# Create window with ImageView widget
 main_window = QtWidgets.QMainWindow()
-# win.showFullScreen()
-# win.resize(800,800)
 main_window.setWindowTitle('pyv')
 
 children = [
-    # dict(name='Вершины', type='str', value='(2:0:1),(4:2:1),(4:-2:1)'),
     Parameter.create(name='Вершины', type='text', value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
     dict(name='Стартовая точка', type='str', value=''),
-    dict(name='Цвета точек', type='str', value='0000ff, 008000, 781f19'),
+    dict(name='Цвета точек', type='str', value='#0000ff, #008000, #781f19'),
     dict(name='Случайные цвета', type='bool', value=False),
     dict(name='lambda', type='float', value=1.0),
     dict(name='projective', type='float', value=1.0),
@@ -232,12 +284,11 @@ children = [
     dict(name='Рисовать абсолют', type='bool', value=True),
     dict(name='Цвет абсолюта', type='str', value='#ff0000'),
     dict(name='Количество точек', type='str', value='2**14'),
-    dict(name='Размер точки', type='float', value=1.0)
+    dict(name='Размер точки', type='float', value=1.0),
+    Parameter.create(name='Checker', type='file')
 ]
 
 children_exp = [
-    dict(name='Имя файла', type='str', value='export'),
-    dict(name='Формат', type='str', value='png'),
     dict(name='dpi', type='int', value=600)
 ]
 
@@ -272,26 +323,16 @@ menu = main_window.menuBar()
 conf = menu.addMenu('Конфигурация')
 conf.addAction(action_export)
 conf.addAction(action_import)
-# conf.addAction('Экспортировать')
-# conf.addAction('Импортировать')
-
 
 
 btn_plot = QtWidgets.QPushButton("Plot")
-# btn_save = QtWidgets.QPushButton("Save")
 btn_export = QtWidgets.QPushButton("Export")
 
-# connect plot to thread
 btn_plot.clicked.connect(plot)
-# btn_save.clicked.connect(save)
 btn_export.clicked.connect(export)
-# plot_thread = threading.Thread(target=plot)
-# btn_plot.clicked.connect(plot_thread.start)
-# btn_reset.clicked.connect(reset)
 
 button_layout = QtWidgets.QHBoxLayout()
 button_layout.addWidget(btn_plot)
-# button_layout.addWidget(btn_save)
 button_layout.addWidget(btn_export)
 
 
@@ -309,38 +350,13 @@ splitter.addWidget(win)
 splitter.addWidget(widget)
 
 
-# layout = QtWidgets.QGridLayout()
-# layout.addWidget(win, 0, 0, 1, 1)
-# layout.addWidget(QtWidgets.QSplitter
-# layout.addWidget(param_tree, 0, 1, 1, 2)
-# layout.setColumnMinimumWidth(2, 500)
-# layout.addWidget(btn_plot, 1, 1)
-# layout.addWidget(btn_reset, 1, 2)
-
-
 main_window.setCentralWidget(splitter)
-
-
-# widget = QtWidgets.QWidget(win)
-# main_window.setCentralWidget(widget)
-# widget.setLayout(splitter)
-
-
 main_window.showMaximized()
 
 
-# layout.showMaximized()
-# layout.show()
-
-# splitter = QtWidgets.QSplitter()
-# splitter.addWidget(param_tree)
-# splitter.addWidget(points)
-#
-# splitter.showMaximized()
-# splitter.show()
-
 worker = None
 x, y, colors = None, None, None
+
 
 if __name__ == '__main__':
     pg.exec()

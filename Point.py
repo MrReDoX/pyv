@@ -9,6 +9,11 @@ class Point2:
     def __str__(self) -> str:
         return str((self.x, self.y))
 
+    def isfinite(self) -> bool:
+        from math import isfinite
+
+        return all(map(isfinite, [self.x, self.y]))
+
     def to_Point3(self, new_z: float):
         return Point3(self.x, self.y, new_z)
 
@@ -27,6 +32,11 @@ class Point3:
 
     def __str__(self) -> str:
         return f'({self.x}:{self.y}:{self.z})'
+
+    def isfinite(self) -> bool:
+        from math import isfinite
+
+        return all(map(isfinite, [self.x, self.y]))
 
     def to_Point2(self) -> Point2:
         if self.z:

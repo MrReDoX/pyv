@@ -55,8 +55,6 @@ class Worker(object):
         return Point(p.x, p.y).within(self.poly)
 
 
-    # TODO
-    # return m instead of setting
     def gen_start_point(self) -> Point2:
         from random import uniform
         from shapely.geometry import Point, Polygon
@@ -110,10 +108,10 @@ class Worker(object):
 
 
     def div_in_rel(self, Ai: Point3, M: Point3, rel=1, inside=True) -> Point2:
-        from math import inf, isinf
+        from math import inf
 
         import Mid as mid
-        if rel != 1:
+        if abs(rel) > 1:
             import Mid_lambda as mid
 
         x = mid.c1(Ai, M, rel)
@@ -122,7 +120,7 @@ class Worker(object):
 
         answer = Point3(x, y, z).to_Point2().to_float()
 
-        if isinf(answer.x):
+        if not answer.isfinite():
             return Point2(inf, inf)
 
         if not self.checker(answer) and inside:
@@ -132,70 +130,73 @@ class Worker(object):
 
             answer = Point3(x, y, z).to_Point2().to_float()
 
-        if isinf(answer.x) or self.checker(answer) != inside:
+        if not answer.isfinite() or self.checker(answer) != inside:
             return Point2(inf, inf)
 
         return answer
 
     def work(self, cnt: int, rel=1) -> (np.ndarray, np.ndarray, np.ndarray):
-        from math import isfinite, inf
         from random import choice
 
-        bounds = lambda x, y: self.xmin < x < self.xmax and self.ymin < y < self.ymax
+        def bounds(p: Point2) -> bool:
+            return p.isfinite and self.xmin < p.x < self.xmax and self.ymin < p.y < self.ymax
 
-        x = np.full(cnt, inf)
-        y = np.full(cnt, inf)
+        def add_point(p, x, y, idx_p, Ai=None, colors=None):
+            x[idx_p] = p.x
+            y[idx_p] = p.y
+
+            if self.coloring:
+                idx_c = self.vertices.index(Ai)
+                colors[k] = self.vertices_colors[idx_c]
+
+        x = np.full(cnt, np.inf)
+        y = np.full(cnt, np.inf)
 
         if self.double_mid:
-            x_out = np.full(cnt, inf)
-            y_out = np.full(cnt, inf)
+            x_out = np.full(cnt, np.inf)
+            y_out = np.full(cnt, np.inf)
+
+            x_out_1 = np.full(cnt, np.inf)
+            y_out_1 = np.full(cnt, np.inf)
 
         colors = ['black'] * len(self.vertices)
         if self.coloring:
             colors = np.empty(cnt, dtype='object')
             colors_out = np.empty(cnt, dtype='object')
+            colors_out_1 = np.empty(cnt, dtype='object')
 
         cur = self.start_point
 
         for k in range(cnt):
-            Ai = choice(self.vertices)
-            M1_proj = cur.to_Point3(self.projective)
+            vertex = choice(self.vertices)
+            cur_proj = cur.to_Point3(self.projective)
 
-            result = self.div_in_rel(Ai, M1_proj, rel=rel)
+            result = self.div_in_rel(vertex, cur_proj, rel=rel)
 
-            if not isfinite(result.x):
-                continue
-
-            if bounds(result.x, result.y):
-                x[k] = result.x
-                y[k] = result.y
-
-                if self.coloring:
-                    idx = self.vertices.index(Ai)
-                    colors[k] = self.vertices_colors[idx]
+            if bounds(result):
+                add_point(result, x, y, k, Ai=vertex, colors=colors)
 
                 cur = result
 
             if self.double_mid:
-                outside = self.div_in_rel(Ai, M1_proj, rel=rel, inside=False)
+                outside = self.div_in_rel(vertex, cur_proj, rel=rel, inside=False)
+                outside_1 = self.div_in_rel(vertex, cur_proj, rel=-rel, inside=False)
 
-                if not isfinite(outside.x):
-                    continue
+                if bounds(outside):
+                    add_point(outside, x_out, y_out, k, Ai=vertex, colors=colors_out)
 
-                if bounds(outside.x, outside.y):
-                    x_out[k] = outside.x
-                    y_out[k] = outside.y
-
-                    if self.coloring:
-                        idx = self.vertices.index(Ai)
-                        colors_out[k] = self.vertices_colors[idx]
+                if bounds(outside_1):
+                    add_point(outside_1, x_out_1, y_out_1, k, Ai=vertex, colors=colors_out_1)
 
         if self.double_mid:
-            x = np.append(x, x_out)
-            y = np.append(y, y_out)
+            # x = np.append(x, x_out)
+            # y = np.append(y, y_out)
+            x = np.append(x, [x_out, x_out_1])
+            y = np.append(y, [y_out, y_out_1])
+
 
             if self.coloring:
-                colors = np.append(colors, colors_out)
+                colors = np.append(colors, [colors_out, colors_out_1])
 
         # Remove inf from x, y
         idx = np.ravel(np.argwhere(np.isfinite(x)))
@@ -241,9 +242,9 @@ class Worker(object):
             # Do not forget to set
             prev = Ai
 
-            M1_proj = cur.to_Point3(self.projective)
+            cur_proj = cur.to_Point3(self.projective)
 
-            result = self.compute_mid(Ai, M1_proj)
+            result = self.compute_mid(Ai, cur_proj)
 
             if math.isinf(result.x):
                 continue
@@ -262,7 +263,7 @@ class Worker(object):
                 cur = result
 
             if self.double_mid:
-                outside = self.compute_mid(Ai, M1_proj, inside=False)
+                outside = self.compute_mid(Ai, cur_proj, inside=False)
 
                 if math.isinf(outside.x):
                     continue

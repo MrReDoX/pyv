@@ -1,9 +1,6 @@
 from Point import Point2
 from Point import Point3
 
-import math
-
-
 def u1(a: Point3, b: Point3) -> float:
     return a.y * b.z - a.z * b.y
 
@@ -17,6 +14,8 @@ def u3(a: Point3, b: Point3) -> float:
 
 
 def omega_1(a: Point3, b: Point3) -> float:
+    from math import inf
+
     t1 = b.x * b.x + b.y * b.y - b.z * b.z
     t2 = a.x * a.x + a.y * a.y - a.z * a.z
 
@@ -28,12 +27,14 @@ def omega_1(a: Point3, b: Point3) -> float:
     bot = a.y * a.y * t1 - b.y * b.y * t2
 
     if not bot:
-        return math.inf
+        return inf
 
     return top / bot
 
 
 def theta(a: Point3, b: Point3) -> float:
+    from math import inf
+
     t1 = b.y * b.y - b.z * b.z
     t2 = a.y * a.y - a.z * a.z
 
@@ -45,18 +46,18 @@ def theta(a: Point3, b: Point3) -> float:
     bot = a.y * a.y * t1 - b.y * b.y * t2
 
     if not bot:
-        return math.inf
+        return inf
 
     return top / bot
 
 
 def c1(a: Point3, b: Point3, eps=1) -> float:
-    from math import inf, isinf, sqrt
+    from math import inf, isfinite, sqrt
 
     Omega = omega_1(a, b)
     Theta = theta(a, b)
 
-    if isinf(Omega):
+    if not isfinite(Omega):
         return inf
 
     underroot = Omega * Omega - Theta
@@ -74,12 +75,12 @@ def c2(a: Point3, b: Point3, eps=1) -> float:
 
 
 def c3(a: Point3, b: Point3, eps=1) -> float:
-    from math import inf, isinf, sqrt
+    from math import inf, isfinite, sqrt
 
     Omega = omega_1(a, b)
     Theta = theta(a, b)
 
-    if isinf(Omega):
+    if not isfinite(Omega):
         return inf
 
     underroot = Omega * Omega - Theta
