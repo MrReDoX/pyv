@@ -36,7 +36,7 @@ class Point3:
     def isfinite(self) -> bool:
         from math import isfinite
 
-        return all(map(isfinite, [self.x, self.y]))
+        return all(map(isfinite, [self.x, self.y, self.z]))
 
     def to_Point2(self) -> Point2:
         if self.z:

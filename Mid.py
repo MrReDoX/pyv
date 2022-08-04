@@ -1,6 +1,7 @@
 from Point import Point2
 from Point import Point3
 
+
 def u1(a: Point3, b: Point3) -> float:
     return a.y * b.z - a.z * b.y
 

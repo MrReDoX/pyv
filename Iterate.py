@@ -5,6 +5,7 @@ from Point import (
 
 import numpy as np
 
+import cProfile
 
 class Worker(object):
     def __init__(self):
@@ -53,7 +54,6 @@ class Worker(object):
         from shapely.geometry import Point, Polygon
 
         return Point(p.x, p.y).within(self.poly)
-
 
     def gen_start_point(self) -> Point2:
         from random import uniform
@@ -135,6 +135,17 @@ class Worker(object):
 
         return answer
 
+    def profile(func):
+        """Decorator for run function profile"""
+        def wrapper(*args, **kwargs):
+            profile_filename = func.__name__ + '.prof'
+            profiler = cProfile.Profile()
+            result = profiler.runcall(func, *args, **kwargs)
+            profiler.dump_stats(profile_filename)
+            return result
+        return wrapper
+
+    @profile
     def work(self, cnt: int, rel=1) -> (np.ndarray, np.ndarray, np.ndarray):
         from random import choice
 
@@ -159,28 +170,26 @@ class Worker(object):
             x_out_1 = np.full(cnt, np.inf)
             y_out_1 = np.full(cnt, np.inf)
 
-        colors = ['black'] * len(self.vertices)
+        colors = ['black' for i in range(len(self.vertices))]
         if self.coloring:
             colors = np.empty(cnt, dtype='object')
             colors_out = np.empty(cnt, dtype='object')
             colors_out_1 = np.empty(cnt, dtype='object')
 
-        cur = self.start_point
+        cur = self.start_point.to_Point3(self.projective)
 
         for k in range(cnt):
             vertex = choice(self.vertices)
-            cur_proj = cur.to_Point3(self.projective)
-
-            result = self.div_in_rel(vertex, cur_proj, rel=rel)
+            result = self.div_in_rel(vertex, cur, rel=rel)
 
             if bounds(result):
                 add_point(result, x, y, k, Ai=vertex, colors=colors)
 
-                cur = result
+                cur = result.to_Point3(self.projective)
 
             if self.double_mid:
-                outside = self.div_in_rel(vertex, cur_proj, rel=rel, inside=False)
-                outside_1 = self.div_in_rel(vertex, cur_proj, rel=-rel, inside=False)
+                outside = self.div_in_rel(vertex, cur, rel=rel, inside=False)
+                outside_1 = self.div_in_rel(vertex, cur, rel=-rel, inside=False)
 
                 if bounds(outside):
                     add_point(outside, x_out, y_out, k, Ai=vertex, colors=colors_out)
