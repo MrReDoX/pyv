@@ -1,15 +1,12 @@
+import math
 import sys
 
-from Point import (
-    Point2,
-    Point3,
-)
+from Point import Point2, Point3
 
 from Iterate import Worker
 from Plotter import Plotter
 from Utility import save_plot
 
-import math
 
 def check(p: Point2):
     conds = list()

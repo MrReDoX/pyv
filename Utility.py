@@ -8,9 +8,10 @@ def save_plot(x: np.ndarray,
               ylims: (float, float),
               colors: np.ndarray,
               A=list()):
+    from math import ceil, log
+
     import matplotlib.pyplot as plt
     from matplotlib.pyplot import figure
-    from math import log, ceil
 
     if file_name.find('eps') != -1:
         return

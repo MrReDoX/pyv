@@ -1,15 +1,11 @@
 import sys
+from math import sqrt
 
-from Point import (
-    Point2,
-    Point3,
-)
+import matplotlib.pyplot as plt
+from Point import Point2, Point3
 
 from Iterate import Worker
 
-import matplotlib.pyplot as plt
-
-from math import sqrt
 
 def check(p: Point2):
     conds = list()

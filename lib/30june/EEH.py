@@ -1,13 +1,10 @@
-from Point import (
-    Point2,
-    Point3,
-)
+import numpy as np
+from Point import Point2, Point3
 
 from Iterate import Worker
 from Plotter import Plotter
 from Utility import save_plot
 
-import numpy as np
 
 def check(p: Point2):
     conds = list()

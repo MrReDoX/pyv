@@ -1,15 +1,11 @@
 import sys
 
-from Point import (
-    Point2,
-    Point3,
-)
+import numpy as np
+from Point import Point2, Point3
 
 from Iterate import Worker
 from Plotter import Plotter
 from Utility import save_plot
-
-import numpy as np
 
 # generate roots of unity
 angles = [1j * 2 * np.pi * k / 5 for k in range(5)]

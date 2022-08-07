@@ -1,11 +1,9 @@
-from Point import (
-    Point2,
-    Point3,
-)
+import cProfile
 
 import numpy as np
 
-import cProfile
+from point import Point2, Point3
+
 
 class Worker(object):
     def __init__(self):
@@ -33,7 +31,7 @@ class Worker(object):
         from shapely.geometry import Point, Polygon
 
         self._vertices = value
-        self.poly = Polygon([(i.to_Point2().x, i.to_Point2().y) for i in self.vertices if isinstance(i, Point3)])
+        self.poly = Polygon([(i.to_point2().x, i.to_point2().y) for i in self.vertices if isinstance(i, Point3)])
 
     def gen_random_colors(self) -> list:
         from random import choice
@@ -57,6 +55,7 @@ class Worker(object):
 
     def gen_start_point(self) -> Point2:
         from random import uniform
+
         from shapely.geometry import Point, Polygon
 
         minx, miny, maxx, maxy = self.poly.bounds
@@ -82,8 +81,8 @@ class Worker(object):
         ymax = -inf
 
         for i in self.vertices:
-            curx = i.to_Point2().x
-            cury = i.to_Point2().y
+            curx = i.to_point2().x
+            cury = i.to_point2().y
 
             xmin = min(xmin, curx)
             xmax = max(xmax, curx)
@@ -118,7 +117,7 @@ class Worker(object):
         y = mid.c2(Ai, M, rel)
         z = mid.c3(Ai, M, rel)
 
-        answer = Point3(x, y, z).to_Point2().to_float()
+        answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite():
             return Point2(inf, inf)
@@ -128,7 +127,7 @@ class Worker(object):
             y = mid.c2(Ai, M, -1 * rel)
             z = mid.c3(Ai, M, -1 * rel)
 
-            answer = Point3(x, y, z).to_Point2().to_float()
+            answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
             return Point2(inf, inf)
@@ -176,7 +175,7 @@ class Worker(object):
             colors_out = np.empty(cnt, dtype='object')
             colors_out_1 = np.empty(cnt, dtype='object')
 
-        cur = self.start_point.to_Point3(self.projective)
+        cur = self.start_point.to_point3(self.projective)
 
         for k in range(cnt):
             vertex = choice(self.vertices)
@@ -185,7 +184,7 @@ class Worker(object):
             if bounds(result):
                 add_point(result, x, y, k, Ai=vertex, colors=colors)
 
-                cur = result.to_Point3(self.projective)
+                cur = result.to_point3(self.projective)
 
             if self.double_mid:
                 outside = self.div_in_rel(vertex, cur, rel=rel, inside=False)
@@ -251,7 +250,7 @@ class Worker(object):
             # Do not forget to set
             prev = Ai
 
-            cur_proj = cur.to_Point3(self.projective)
+            cur_proj = cur.to_point3(self.projective)
 
             result = self.compute_mid(Ai, cur_proj)
 

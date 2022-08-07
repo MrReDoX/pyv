@@ -1,8 +1,8 @@
-import pyqtgraph as pg
-import pyqtgraph.exporters
+import math
 
 import numpy as np
-import math
+import pyqtgraph as pg
+import pyqtgraph.exporters
 
 
 class Plotter:

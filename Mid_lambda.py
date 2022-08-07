@@ -1,5 +1,4 @@
-from Point import Point2
-from Point import Point3
+from point import Point2, Point3
 
 
 def u1(a: Point3, b: Point3) -> float:
@@ -66,7 +65,7 @@ def k2(a: Point3, b: Point3) -> complex:
 
 
 def omega1(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isfinite, exp, log
+    from cmath import exp, inf, isfinite, log
 
     K1 = k1(a, b)
     K = k(a, b)
@@ -84,7 +83,7 @@ def omega1(a: Point3, b: Point3, coeff: float) -> complex:
 
 
 def omega2(a: Point3, b: Point3, coeff: float) -> float:
-    from cmath import inf, isfinite, exp, log
+    from cmath import exp, inf, isfinite, log
 
     K2 = k2(a, b)
     K = k(a, b)

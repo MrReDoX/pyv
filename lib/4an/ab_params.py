@@ -1,15 +1,10 @@
 import sys
-
-from Point import (
-    Point2,
-    Point3,
-)
-
-from Iterate import Worker
+from math import sqrt
 
 import matplotlib.pyplot as plt
+from Point import Point2, Point3
 
-from math import sqrt
+from Iterate import Worker
 
 A, B = map(float, input('A, B: ').split())
 

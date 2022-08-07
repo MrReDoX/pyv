@@ -1,19 +1,14 @@
 import sys
+from math import pi, sqrt
+from random import shuffle, uniform
+from time import sleep
 
-from Point import (
-    Point2,
-    Point3,
-)
+import numpy as np
+from Point import Point2, Point3
 
 from Iterate import Worker
 # from Plotter import Plotter
 from Utility import save_plot
-
-import numpy as np
-
-from math import sqrt, pi
-from random import shuffle, uniform
-from time import sleep
 
 # number of verticies
 n = 7

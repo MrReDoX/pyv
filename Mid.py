@@ -1,5 +1,4 @@
-from Point import Point2
-from Point import Point3
+from point import Point2, Point3
 
 
 def u1(a: Point3, b: Point3) -> float:
