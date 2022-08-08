@@ -1,4 +1,7 @@
-from point import Point2, Point3
+import cmath
+import math
+
+from point import Point3
 
 
 def u1(a: Point3, b: Point3) -> float:
@@ -10,99 +13,85 @@ def u2(a: Point3, b: Point3) -> float:
 
 
 def u3(a: Point3, b: Point3) -> float:
-    from math import inf
-
     answer = a.x * b.y - a.y * b.x
 
     if not answer:
-        return inf
+        return math.inf
 
     return answer
 
 
 def k(a: Point3, b: Point3) -> float:
-    from math import inf, isfinite
-
     U1 = u1(a, b)
     U3 = u3(a, b)
 
-    if not isfinite(U3):
-        return inf
+    if not math.isfinite(U3):
+        return math.inf
 
-    return U1 * U1 - U3 * U3
+    return U1**2 - U3**2
 
 
 def k1(a: Point3, b: Point3) -> complex:
-    from cmath import inf, isfinite, sqrt
-
     U1 = u1(a, b)
     U2 = u2(a, b)
     U3 = u3(a, b)
 
-    if not isfinite(U3):
-        return inf
+    if not cmath.isfinite(U3):
+        return cmath.inf
 
     s1 = -U1 * U2
-    s2 = U3 * sqrt(U1 * U1 + U2 * U2 - U3 * U3)
+    s2 = U3 * cmath.sqrt(U1**2 + U2**2 - U3**2)
 
     return s1 + s2
 
 
 def k2(a: Point3, b: Point3) -> complex:
-    from cmath import inf, isfinite, sqrt
-
     U1 = u1(a, b)
     U2 = u2(a, b)
     U3 = u3(a, b)
 
-    if not isfinite(U3):
-        return inf
+    if not cmath.isfinite(U3):
+        return cmath.inf
 
     s1 = -U1 * U2
-    s2 = U3 * sqrt(U1**2 + U2**2 - U3**2)
+    s2 = U3 * cmath.sqrt(U1**2 + U2**2 - U3**2)
 
     return s1 - s2
 
 
 def omega1(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import exp, inf, isfinite, log
-
     K1 = k1(a, b)
     K = k(a, b)
 
-    if not (isfinite(K1) and isfinite(K)):
-        return inf
+    if not all(map(cmath.isfinite, [K1, K])):
+        return cmath.inf
 
     m1 = a.x * K - a.y * K1
     m2 = b.x * K - b.y * K1
 
     if not m1 * m2:
-        return inf
+        return cmath.inf
 
     return m1**(1 / (1 + coeff)) * m2**(coeff / (1 + coeff))
 
 
 def omega2(a: Point3, b: Point3, coeff: float) -> float:
-    from cmath import exp, inf, isfinite, log
-
     K2 = k2(a, b)
     K = k(a, b)
 
-    if not (isfinite(K2) and isfinite(K)):
-        return inf
+    if not all(map(cmath.isfinite, [K2, K])):
+        return cmath.inf
 
     m1 = a.x * K - a.y * K2
     m2 = b.x * K - b.y * K2
 
     if not m1 * m2:
-        return inf
+        return cmath.inf
 
     return m1**(1 / (1 + coeff)) * m2**(coeff / (1 + coeff))
 
 
-def c1(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isfinite
-
+def first_coord(a: Point3, b: Point3, coeff: float) -> complex:
     U3 = u3(a, b)
     K1 = k1(a, b)
     K2 = k2(a, b)
@@ -110,34 +99,26 @@ def c1(a: Point3, b: Point3, coeff: float) -> complex:
     Omega2 = omega2(a, b, coeff)
 
     vals = [U3, K1, K2, Omega1, Omega2]
-    if any(map(lambda x: not isfinite(x), vals)):
-        return inf
+    if not all(map(cmath.isfinite, vals)):
+        return cmath.inf
 
-    answer = U3 * (K2 * Omega1 - K1 * Omega2)
-
-    return answer
+    return U3 * (K2 * Omega1 - K1 * Omega2)
 
 
-def c2(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isfinite
-
+def second_coord(a: Point3, b: Point3, coeff: float) -> complex:
     U3 = u3(a, b)
     K = k(a, b)
     Omega1 = omega1(a, b, coeff)
     Omega2 = omega2(a, b, coeff)
 
     vals = [U3, K, Omega1, Omega2]
-    if any(map(lambda x: not isfinite(x), vals)):
-        return inf
+    if not all(map(cmath.isfinite, vals)):
+        return cmath.inf
 
-    answer = U3 * K * (Omega1 - Omega2)
-
-    return answer
+    return U3 * K * (Omega1 - Omega2)
 
 
-def c3(a: Point3, b: Point3, coeff: float) -> complex:
-    from cmath import inf, isfinite
-
+def third_coord(a: Point3, b: Point3, coeff: float) -> complex:
     U1 = u1(a, b)
     U2 = u2(a, b)
     K = k(a, b)
@@ -147,13 +128,10 @@ def c3(a: Point3, b: Point3, coeff: float) -> complex:
     Omega2 = omega2(a, b, coeff)
 
     vals = [U1, U2, K, K1, K2, Omega1, Omega2]
-    if any(map(lambda x: not isfinite(x), vals)):
-        return inf
+    if not all(map(cmath.isfinite, vals)):
+        return cmath.inf
 
     s1 = Omega2 * (U1 * K1 + U2 * K)
     s2 = Omega1 * (U1 * K2 + U2 * K)
 
-    answer = s1 - s2
-
-    return answer
-
+    return s1 - s2

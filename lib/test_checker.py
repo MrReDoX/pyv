@@ -1,4 +1,4 @@
-from Point import Point2
+from point import Point2
 
 
 def checker(p: Point2) -> bool:

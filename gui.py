@@ -19,7 +19,7 @@ import pyqtgraph as pg
 from pyqtgraph.parametertree import Parameter, ParameterTree
 from pyqtgraph.Qt import QtGui, QtWidgets
 
-from Iterate import Worker
+from iterate import Worker
 from point import Point2, Point3
 
 
