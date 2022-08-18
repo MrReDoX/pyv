@@ -6,8 +6,6 @@ from shapely.geometry import Point, Polygon
 
 from point import Point2, Point3
 
-from concurrent.futures import ThreadPoolExecutor
-
 import cProfile
 
 
@@ -126,12 +124,6 @@ class Worker:
             return Point2(inf, inf)
 
         if not self.checker(answer) and inside:
-            with ThreadPoolExecutor() as executor:
-                functions = [mid.first_coord, mid.second_coord, mid.third_coord]
-                futures = [executor.submit(f, vertex, cur, rel) for f in functions]
-
-                x, y, z = [f.result() for f in futures]
-
             x = mid.first_coord(vertex, cur, -rel)
             y = mid.second_coord(vertex, cur, -rel)
             z = mid.third_coord(vertex, cur, -rel)
