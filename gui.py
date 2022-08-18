@@ -2,14 +2,15 @@
 # Экспортирование дерева "Экспорт"
 # Рисовать точку за точкой?
 # status bar?
-# split files
-# read config function
+# Iterate.py: x -> xs, y -> ys
 
 # https://pyqtgraph.readthedocs.io/en/latest/parametertree/parametertypes.html
 
+import itertools
 import json
 import os
 import sys
+import threading
 from math import inf, pi
 from pathlib import Path
 
@@ -21,7 +22,6 @@ from pyqtgraph.Qt import QtGui, QtWidgets
 
 from iterate import Worker
 from point import Point2, Point3
-
 
 # format: "(x, y)"
 def parse_m(data: str) -> Point2:
@@ -68,281 +68,283 @@ def parse_limits(data: str) -> (float, float, float, float):
     return tuple(float(i) for i in data)
 
 
-def plot():
-    global WORKER, CANVAS
-    global X, Y, COLORS
+class Application:
+    def __init__(self):
+        pg.setConfigOptions(antialias=True)
+        self.app = pg.mkQApp('pyv')
 
-    main_window.setWindowTitle('pyv BUSY')
+        self.main_window = QtWidgets.QMainWindow()
+        self.main_window.setWindowTitle('pyv')
 
-    WIN.clear()
+        children = [
+            Parameter.create(name='Вершины', type='text', value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
+            dict(name='Стартовая точка', type='str', value=''),
+            dict(name='Цвета точек', type='str', value='#0000ff, #008000, #781f19'),
+            dict(name='Случайные цвета', type='bool', value=False),
+            dict(name='lambda', type='float', value=1.0),
+            dict(name='projective', type='float', value=1.0),
+            dict(name='Рисовать вторую середину', type='bool', value=False),
+            dict(name='Пределы', type='str', value=''),
+            dict(name='Угадывать пределы', type='bool', value=False),
+            dict(name='Угадывать пределы (включить абсолют)', type='bool', value=True),
+            dict(name='Рисовать границы', type='bool', value=True),
+            dict(name='Ширина границ', type='float', value=3.0),
+            dict(name='Рисовать абсолют', type='bool', value=True),
+            dict(name='Цвет абсолюта', type='str', value='#ff0000'),
+            dict(name='Количество точек', type='str', value='2**14'),
+            dict(name='Размер точки', type='float', value=1.0),
+            Parameter.create(name='Checker', type='file')
+        ]
 
-    WORKER = Worker()
-    WORKER.vertices = parse_vertices(params.child('Вершины').value())
+        children_exp = [
+            dict(name='dpi', type='int', value=600)
+        ]
 
-    WORKER.start_point = parse_m(params.child('Стартовая точка').value())
-    if not params.child('Стартовая точка').value():
-        WORKER.start_point = WORKER.gen_start_point()
+        self.params = Parameter.create(name='Параметры', type='group', children=children)
+        self.params_exp = Parameter.create(name='Экспорт', type='group', children=children_exp)
+        param_tree = ParameterTree(showHeader=False)
+        param_tree.addParameters(self.params)
+        param_tree.addParameters(self.params_exp)
 
-    WORKER.coloring = False
-    if colors := params.child('Цвета точек').value():
-        WORKER.coloring = True
-        WORKER.vertices_colors = parse_colors(colors)
+        self.win = pg.GraphicsLayoutWidget(show=False)
+        self.canvas= self.win.addPlot()
+        self.canvas.setAspectLocked(True, 1.0)
 
-    if params.child('Случайные цвета').value():
-        WORKER.coloring = True
-        WORKER.vertices_colors = WORKER.gen_random_colors()
+        self.win.setBackground('w')
 
-    relation = params.child('lambda').value()
-    WORKER.projective = params.child('projective').value()
-    WORKER.double_mid = params.child('Рисовать вторую середину').value()
+        action_export = QtGui.QAction(self.main_window)
+        action_export.setObjectName('actionExport')
+        action_export.setText('Экспортировать')
+        action_export.triggered.connect(self.export_conf)
 
-    xmin, xmax, ymin, ymax = parse_limits(params.child('Пределы').value())
-    if not params.child('Пределы').value():
+        action_import = QtGui.QAction(self.main_window)
+        action_import.setObjectName('actionImport')
+        action_import.setText('Импортировать')
+        action_import.triggered.connect(self.import_conf)
 
-        xmin, xmax, ymin, ymax = WORKER.guess_limits()
-        if params.child('Угадывать пределы (включить абсолют)').value():
-            xmin, xmax, ymin, ymax = WORKER.guess_limits(contains_absolute = True)
 
-    WORKER.xmin, WORKER.xmax = xmin, xmax
-    WORKER.ymin, WORKER.ymax = ymin, ymax
+        menu = self.main_window.menuBar()
+        conf = menu.addMenu('Конфигурация')
+        conf.addAction(action_export)
+        conf.addAction(action_import)
 
-    CANVAS = WIN.addPlot()
-    CANVAS.setAspectLocked(True, 1.0)
-    CANVAS.setXRange(xmin, xmax)
-    CANVAS.setYRange(ymin, ymax)
 
-    if params.child('Рисовать границы').value():
-        width = 3.0
-        if value := params.child('Ширина границ').value():
-            width = value
+        btn_plot = QtWidgets.QPushButton("Plot")
+        btn_export = QtWidgets.QPushButton("Export")
 
-        tmp = [i.to_point2() for i in WORKER.vertices]
+        btn_plot.clicked.connect(self.plot)
+        btn_export.clicked.connect(self.export)
 
-        for j in range(len(tmp)):
-            x_values = [tmp[j].x, tmp[(j + 1) % len(tmp)].x]
-            y_values = [tmp[j].y, tmp[(j + 1) % len(tmp)].y]
+        button_layout = QtWidgets.QHBoxLayout()
+        button_layout.addWidget(btn_plot)
+        button_layout.addWidget(btn_export)
 
-            CANVAS.plot(x_values, y_values, pen=pg.mkPen('#000000', width=width))
 
-    if params.child('Рисовать абсолют').value():
-        color = '#ff0000'
-        if val := params.child('Цвет абсолюта').value():
-            color = val
+        main_layout = QtWidgets.QVBoxLayout()
+        main_layout.addWidget(param_tree)
+        main_layout.addLayout(button_layout)
 
-        points = np.linspace(0, 2 * pi, num=200)
-        circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color))
-        CANVAS.addItem(circle)
 
-    if val := params.child('Checker').value():
+        widget = QtWidgets.QWidget()
+        widget.setLayout(main_layout)
 
-        sys.path.append(os.path.dirname(val))
 
-        module = __import__(Path(val).stem)
+        splitter = QtWidgets.QSplitter()
+        splitter.addWidget(self.win)
+        splitter.addWidget(widget)
 
-        WORKER.checker = module.checker
 
+        self.main_window.setCentralWidget(splitter)
+        self.main_window.showMaximized()
 
-    cnt = eval(params.child("Количество точек").value())
 
-    X, Y, COLORS = WORKER.clean(*WORKER.work(cnt, rel=relation))
+        self.worker = Worker()
+        self.xs, self.ys, self.colors = None, None, None
 
-    size = 1.0
-    if val := params.child('Размер точки').value():
-        size = val
 
-    CANVAS.addItem(pg.ScatterPlotItem(x=X, y=Y, size=size, brush=COLORS))
 
-    main_window.setWindowTitle('pyv DONE')
+    def read_config(self):
+        self.worker.vertices = parse_vertices(self.params.child('Вершины').value())
 
+        self.worker.start_point = parse_m(self.params.child('Стартовая точка').value())
+        if not self.params.child('Стартовая точка').value():
+            self.worker.start_point = self.worker.gen_start_point()
 
-def export():
-    main_window.setWindowTitle('pyv EXPORTING')
+        self.worker.coloring = False
+        if val := self.params.child('Цвета точек').value():
+            self.worker.coloring = True
+            self.worker.vertices_colors = parse_colors(val)
 
-    plt.gca().set_aspect('equal', adjustable='box')
+        if self.params.child('Случайные цвета').value():
+            self.worker.coloring = True
+            self.worker.vertices_colors = self.worker.gen_random_colors()
 
-    if params.child('Рисовать абсолют').value():
-        color = 'red'
-        if val := params.child('Цвет абсолюта').value():
-            color = val
+        self.worker.projective = self.params.child('projective').value()
+        self.worker.double_mid = self.params.child('Рисовать вторую середину').value()
 
-        plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color=color))
+        xmin, xmax, ymin, ymax = parse_limits(self.params.child('Пределы').value())
+        if not self.params.child('Пределы').value():
+            xmin, xmax, ymin, ymax = self.worker.guess_limits()
+            if self.params.child('Угадывать пределы (включить абсолют)').value():
+                xmin, xmax, ymin, ymax = self.worker.guess_limits(contains_absolute = True)
 
-    plt.xlim(WORKER.xmin, WORKER.xmax)
-    plt.ylim(WORKER.ymin, WORKER.ymax)
-
-    if params.child('Рисовать границы').value():
-        width = 1.0
-        # if value := params.child('Ширина границ').value():
-        #     width = value / 2
-
-        tmp = [k.to_point2() for k in WORKER.vertices]
-        for k in range(len(tmp)):
-            x_values = [tmp[k].x, tmp[(k + 1) % len(tmp)].x]
-            y_values = [tmp[k].y, tmp[(k + 1) % len(tmp)].y]
-
-            plt.plot(x_values, y_values, c='black', linewidth=width)
-
-    size = 1.0
-    # if val := params.child('Размер точки').value():
-    #     size = val
-
-    path, _ = QtWidgets.QFileDialog.getSaveFileName(
-        parent=main_window,
-        caption='Выберите файл',
-        directory=os.getcwd(),
-    )
-
-    file_name = os.path.basename(path)
-
-    if not file_name:
-        return
-
-    dpi = 600
-    if val := params_exp.child('dpi').value():
-        dpi = val
-
-    plt.scatter(X, Y, c=COLORS, s=size/2, edgecolors='none')
-    plt.savefig(file_name, dpi=dpi)
-
-    plt.close()
-    plt.cla()
-    plt.clf()
-
-    main_window.setWindowTitle('pyv DONE')
-
-
-def export_conf():
-    filt = 'Json File (*.json)'
-    path, _ = QtWidgets.QFileDialog.getSaveFileName(
-        parent=main_window,
-        caption='Выберите файл',
-        directory=os.getcwd(),
-        filter=filt,
-        initialFilter=filt
-    )
-
-    if not path:
-        return
+        self.worker.xmin, self.worker.xmax = xmin, xmax
+        self.worker.ymin, self.worker.ymax = ymin, ymax
 
-    if path.rfind('.json') == -1:
-        path += '.json'
+        self.canvas = self.win.addPlot()
+        self.canvas.setAspectLocked(True, 1.0)
+        self.canvas.setXRange(xmin, xmax)
+        self.canvas.setYRange(ymin, ymax)
 
-    with open(path, 'w', encoding='utf-8') as file:
-        json.dump(params.saveState(), file)
+        if val := self.params.child('Checker').value():
+            sys.path.append(os.path.dirname(val))
+            module = __import__(Path(val).stem)
 
+            self.worker.checker = module.checker
 
-def import_conf():
-    filt = 'Json File (*.json)'
-    path, _ = QtWidgets.QFileDialog.getOpenFileName(
-        parent=main_window,
-        caption='Выберите файл',
-        directory=os.getcwd(),
-        filter=filt,
-        initialFilter=filt
-    )
+        if self.params.child('Рисовать границы').value():
+            width = 3.0
+            if val := self.params.child('Ширина границ').value():
+                width = val
 
-    if not path:
-        return
+            tmp = [i.to_point2() for i in self.worker.vertices + [self.worker.vertices[0]]]
+            for cur, nex in itertools.pairwise(tmp):
+                self.canvas.plot([cur.x, nex.x],
+                                 [cur.y, nex.y],
+                                 pen=pg.mkPen('#000000',
+                                 width=width))
 
-    with open(path, 'r', encoding='utf-8') as file:
-        params.restoreState(json.load(file))
+        if self.params.child('Рисовать абсолют').value():
+            color = '#ff0000'
+            if val := self.params.child('Цвет абсолюта').value():
+                color = val
 
-pg.setConfigOptions(antialias=True)
+            points = np.linspace(0, 2 * pi, num=200)
+            circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color))
+            self.canvas.addItem(circle)
 
-app = pg.mkQApp('pyv')
 
-main_window = QtWidgets.QMainWindow()
-main_window.setWindowTitle('pyv')
+    def plot(self):
+        self.main_window.setWindowTitle('pyv BUSY')
+        self.win.clear()
 
-children = [
-    Parameter.create(name='Вершины', type='text', value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
-    dict(name='Стартовая точка', type='str', value=''),
-    dict(name='Цвета точек', type='str', value='#0000ff, #008000, #781f19'),
-    dict(name='Случайные цвета', type='bool', value=False),
-    dict(name='lambda', type='float', value=1.0),
-    dict(name='projective', type='float', value=1.0),
-    dict(name='Рисовать вторую середину', type='bool', value=False),
-    dict(name='Пределы', type='str', value=''),
-    dict(name='Угадывать пределы', type='bool', value=False),
-    dict(name='Угадывать пределы (включить абсолют)', type='bool', value=True),
-    dict(name='Рисовать границы', type='bool', value=True),
-    dict(name='Ширина границ', type='float', value=3.0),
-    dict(name='Рисовать абсолют', type='bool', value=True),
-    dict(name='Цвет абсолюта', type='str', value='#ff0000'),
-    dict(name='Количество точек', type='str', value='2**14'),
-    dict(name='Размер точки', type='float', value=1.0),
-    Parameter.create(name='Checker', type='file')
-]
+        self.read_config()
 
-children_exp = [
-    dict(name='dpi', type='int', value=600)
-]
+        relation = self.params.child('lambda').value()
+        cnt = eval(self.params.child("Количество точек").value())
 
-params = Parameter.create(name='Параметры', type='group', children=children)
-params_exp = Parameter.create(name='Экспорт', type='group', children=children_exp)
-param_tree = ParameterTree(showHeader=False)
-param_tree.addParameters(params)
-param_tree.addParameters(params_exp)
+        # run in separate thread
+        plot_thread = threading.Thread(target = self.worker.work,
+                                       args=(cnt,), kwargs={'rel': relation})
+        plot_thread.start()
+        plot_thread.join()
 
-WIN = pg.GraphicsLayoutWidget(show=False)
-CANVAS = WIN.addPlot()
-CANVAS.setAspectLocked(True, 1.0)
+        self.xs, self.ys, self.colors = self.worker.clean(self.worker.x,
+                                                        self.worker.y,
+                                                        self.worker.colors)
 
-WIN.setBackground('w')
+        size = 1.0
+        if val := self.params.child('Размер точки').value():
+            size = val
 
-# tmp = np.linspace(0, 2 * pi, num=200)
-# circle = pg.PlotCurveItem(np.cos(tmp), np.sin(tmp), pen = pg.mkPen('#ff0000'))
-# CANVAS.addItem(circle)
+        self.canvas.addItem(pg.ScatterPlotItem(x=self.xs,
+                                               y=self.ys,
+                                               size=size,
+                                               brush=self.colors))
 
-action_export = QtGui.QAction(main_window)
-action_export.setObjectName('actionExport')
-action_export.setText('Экспортировать')
-action_export.triggered.connect(export_conf)
+        self.main_window.setWindowTitle('pyv DONE')
 
-action_import = QtGui.QAction(main_window)
-action_import.setObjectName('actionImport')
-action_import.setText('Импортировать')
-action_import.triggered.connect(import_conf)
 
+    def export(self):
+        self.main_window.setWindowTitle('pyv EXPORTING')
 
-menu = main_window.menuBar()
-conf = menu.addMenu('Конфигурация')
-conf.addAction(action_export)
-conf.addAction(action_import)
+        plt.gca().set_aspect('equal', adjustable='box')
 
+        if self.params.child('Рисовать абсолют').value():
+            color = 'red'
+            if val := self.params.child('Цвет абсолюта').value():
+                color = val
 
-btn_plot = QtWidgets.QPushButton("Plot")
-btn_export = QtWidgets.QPushButton("Export")
+            plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color=color))
 
-btn_plot.clicked.connect(plot)
-btn_export.clicked.connect(export)
+        plt.xlim(self.worker.xmin, self.worker.xmax)
+        plt.ylim(self.worker.ymin, self.worker.ymax)
 
-button_layout = QtWidgets.QHBoxLayout()
-button_layout.addWidget(btn_plot)
-button_layout.addWidget(btn_export)
+        if self.params.child('Рисовать границы').value():
+            width = 1.0
+            # if value := params.child('Ширина границ').value():
+            #     width = value / 2
 
+            tmp = [i.to_point2() for i in self.worker.vertices + [self.worker.vertices[0]]]
+            for cur, nex in itertools.pairwise(tmp):
+                plt.plot([cur.x, nex.x], [cur.y, nex.y], c='black', linewidth=width)
 
-main_layout = QtWidgets.QVBoxLayout()
-main_layout.addWidget(param_tree)
-main_layout.addLayout(button_layout)
+        size = 1.0
+        # if val := params.child('Размер точки').value():
+        #     size = val
 
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            parent=self.main_window,
+            caption='Выберите файл',
+            directory=os.getcwd(),
+        )
 
-widget = QtWidgets.QWidget()
-widget.setLayout(main_layout)
+        file_name = os.path.basename(path)
 
+        if not file_name:
+            return
 
-splitter = QtWidgets.QSplitter()
-splitter.addWidget(WIN)
-splitter.addWidget(widget)
+        dpi = 600
+        if val := self.params_exp.child('dpi').value():
+            dpi = val
 
+        plt.scatter(self.xs, self.ys, c=self.colors, s=size/2, edgecolors='none')
+        plt.savefig(file_name, dpi=dpi)
 
-main_window.setCentralWidget(splitter)
-main_window.showMaximized()
+        plt.close()
+        plt.cla()
+        plt.clf()
 
+        self.main_window.setWindowTitle('pyv DONE')
 
-WORKER = None
-X, Y, COLORS = None, None, None
+
+    def export_conf(self):
+        filt = 'Json File (*.json)'
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            parent=self.main_window,
+            caption='Выберите файл',
+            directory=os.getcwd(),
+            filter=filt,
+            initialFilter=filt
+        )
+
+        if not path:
+            return
+
+        if path.rfind('.json') == -1:
+            path += '.json'
+
+        with open(path, 'w', encoding='utf-8') as file:
+            json.dump(self.params.saveState(), file)
+
+
+    def import_conf(self):
+        filt = 'Json File (*.json)'
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            parent=self.main_window,
+            caption='Выберите файл',
+            directory=os.getcwd(),
+            filter=filt,
+            initialFilter=filt
+        )
+
+        if not path:
+            return
+
+        with open(path, 'r', encoding='utf-8') as file:
+            self.params.restoreState(json.load(file))
 
 
 if __name__ == '__main__':
+    app = Application()
     pg.exec()

@@ -6,6 +6,10 @@ from shapely.geometry import Point, Polygon
 
 from point import Point2, Point3
 
+from concurrent.futures import ThreadPoolExecutor
+
+import cProfile
+
 
 class Worker:
     def __init__(self):
@@ -27,6 +31,18 @@ class Worker:
     def vertices(self) -> list:
         return self._vertices
 
+    @property
+    def x(self) -> list:
+        return self._x
+
+    @property
+    def y(self) -> list:
+        return self._y
+
+    @property
+    def colors(self) -> list:
+        return self._colors
+
     @vertices.setter
     def vertices(self, value):
         self._vertices = value
@@ -39,8 +55,6 @@ class Worker:
             return '#' + ''.join([choice(data) for j in range(6)])
 
         answer = [gen() for i in range(len(self.vertices))]
-
-        # answer = [tuple(rng.integers(0, 256) / 256 for i in range(3)) for i in range(len(self.vertices))]
 
         return answer
 
@@ -106,14 +120,18 @@ class Worker:
         y = mid.second_coord(vertex, cur, rel)
         z = mid.third_coord(vertex, cur, rel)
 
-        # print(x, y, z)
-
         answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite():
             return Point2(inf, inf)
 
         if not self.checker(answer) and inside:
+            with ThreadPoolExecutor() as executor:
+                functions = [mid.first_coord, mid.second_coord, mid.third_coord]
+                futures = [executor.submit(f, vertex, cur, rel) for f in functions]
+
+                x, y, z = [f.result() for f in futures]
+
             x = mid.first_coord(vertex, cur, -rel)
             y = mid.second_coord(vertex, cur, -rel)
             z = mid.third_coord(vertex, cur, -rel)
@@ -125,6 +143,19 @@ class Worker:
 
         return answer
 
+
+    def profile(func):
+        """Decorator for run function profile"""
+        def wrapper(*args, **kwargs):
+            profile_filename = func.__name__ + '.prof'
+            profiler = cProfile.Profile()
+            result = profiler.runcall(func, *args, **kwargs)
+            profiler.dump_stats(profile_filename)
+            return result
+        return wrapper
+
+
+    @profile
     def work(self, cnt: int, rel=1) -> (np.ndarray, np.ndarray, np.ndarray):
         def bounds(p: Point2) -> bool:
             return p.isfinite and self.xmin < p.x < self.xmax and self.ymin < p.y < self.ymax
@@ -184,7 +215,11 @@ class Worker:
         # Remove inf from xs[0], ys[0]
         idx = np.ravel(np.argwhere(np.isfinite(xs[0])))
 
-        return np.take(xs[0], idx), np.take(ys[0], idx), np.take(colors[0], idx, mode='clip')
+        self._x = np.take(xs[0], idx)
+        self._y = np.take(ys[0], idx)
+        self._colors = np.take(colors[0], idx, mode='clip')
+
+        return self._x, self._y, self._colors
 
     def clean(self, x, y, colors) -> (np.ndarray, np.ndarray, np.ndarray):
         np.round(x, decimals=3, out=x)
