@@ -294,7 +294,7 @@ class Application:
         if val := self.params_exp.child('dpi').value():
             dpi = val
 
-        plt.scatter(self.xs, self.ys, c=self.colors, s=size/2, edgecolors='none')
+        plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size/2, edgecolors='none')
         plt.savefig(file_name, dpi=dpi)
 
         plt.close()
