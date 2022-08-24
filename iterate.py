@@ -15,7 +15,7 @@ class Worker:
         self._vertices = []
         self.checker = self.convex_trick
         self.vertices_colors = []
-        self.coloring = False
+        self.coloring = True
         self.double_mid = False
         self.projective = 1
 
@@ -120,10 +120,7 @@ class Worker:
 
         answer = Point3(x, y, z).to_point2().to_float()
 
-        if not answer.isfinite():
-            return Point2(inf, inf)
-
-        if not self.checker(answer) and inside:
+        if not answer.isfinite() or self.checker(answer) != inside:
             x = mid.first_coord(vertex, cur, -rel)
             y = mid.second_coord(vertex, cur, -rel)
             z = mid.third_coord(vertex, cur, -rel)
@@ -131,7 +128,7 @@ class Worker:
             answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
-            return Point2(inf, inf)
+            return cur.to_point2()
 
         return answer
 
@@ -148,75 +145,48 @@ class Worker:
 
 
     @profile
-    def work(self, cnt: int, rel=1) -> (np.ndarray, np.ndarray, np.ndarray):
+    def work(self, cnt: int, rel=1):
         def bounds(p: Point2) -> bool:
             return p.isfinite and self.xmin < p.x < self.xmax and self.ymin < p.y < self.ymax
 
-        def add_point(p, x, y, idx_p, vert=None, colors=None):
+        def add_point(p, x, y, vert=None, colors=None):
             if not bounds(p):
                 return False
 
-            x[idx_p] = p.x
-            y[idx_p] = p.y
-
-            if self.coloring:
-                colors[k] = self.vertices_colors[self.vertices.index(vert)]
+            x.append(p.x)
+            y.append(p.y)
+            colors.append(self.vertices_colors[self.vertices.index(vert)])
 
             return True
 
         xs = []
         ys = []
-
-        xs.append(np.full(cnt, np.inf))
-        ys.append(np.full(cnt, np.inf))
-
-        if self.double_mid:
-            xs.extend([np.full(cnt, np.inf)]*2)
-            ys.extend([np.full(cnt, np.inf)]*2)
-
-        # xs[0] -- main x
-        # xs[1] -- out x
-        # xs[2] -- out_1 x
-        # and same for ys
-
-        colors = [['black' for i in range(len(self.vertices))]]
-        if self.coloring:
-            colors = [np.empty(cnt, dtype='object')] * 3
+        colors = []
 
         cur = self.start_point.to_point3(self.projective)
 
-        for k in range(cnt):
+        while len(xs) < cnt:
             vertex = choice(self.vertices)
             result = self.div_in_rel(vertex, cur, rel=rel)
 
-            if add_point(result, xs[0], ys[0], k, vert=vertex, colors=colors[0]):
+            if add_point(result, xs, ys, vert=vertex, colors=colors):
                 cur = result.to_point3(self.projective)
 
             if self.double_mid:
-                for idx, val in enumerate([rel, -rel], start=1):
+                for val in [rel, -rel]:
                     out = self.div_in_rel(vertex, cur, rel=val, inside=False)
-                    add_point(out, xs[idx], ys[idx], k, vert=vertex, colors=colors[idx])
+                    add_point(out, xs, ys, vert=vertex, colors=colors)
 
-        if self.double_mid:
-            xs[0] = np.append(xs[0], [xs[1], xs[2]])
-            ys[0] = np.append(ys[0], [ys[1], ys[2]])
+        self._x = np.array(xs)
+        self._y = np.array(ys)
+        self._colors = np.array(colors)
 
-            if self.coloring:
-                colors[0] = np.append(colors[0], [colors[1], colors[2]])
+    def clean(self):
+        self._x = np.round(self._x, decimals=3)
+        self._y = np.round(self._y, decimals=3)
 
-        # Remove inf from xs[0], ys[0]
-        idx = np.ravel(np.argwhere(np.isfinite(xs[0])))
+        _, idx = np.unique(self._x + 1j * self._y, return_index=True)
 
-        self._x = np.take(xs[0], idx)
-        self._y = np.take(ys[0], idx)
-        self._colors = np.take(colors[0], idx, mode='clip')
-
-        return self._x, self._y, self._colors
-
-    def clean(self, x, y, colors) -> (np.ndarray, np.ndarray, np.ndarray):
-        np.round(x, decimals=3, out=x)
-        np.round(y, decimals=3, out=y)
-
-        _, idx = np.unique(x + 1j * y, return_index=True)
-
-        return np.take(x, idx), np.take(y, idx), np.take(colors, idx, mode='clip')
+        self._x = np.take(self._x, idx)
+        self._y = np.take(self._y, idx)
+        self._colors = np.take(self._colors, idx, mode='clip')

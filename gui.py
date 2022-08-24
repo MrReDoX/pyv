@@ -1,5 +1,4 @@
 # TODO
-# Экспортирование дерева "Экспорт"
 # Рисовать точку за точкой?
 # status bar?
 # Iterate.py: x -> xs, y -> ys
@@ -159,7 +158,6 @@ class Application:
 
 
         self.worker = Worker()
-        self.xs, self.ys, self.colors = None, None, None
 
 
 
@@ -239,18 +237,16 @@ class Application:
         plot_thread.start()
         plot_thread.join()
 
-        self.xs, self.ys, self.colors = self.worker.clean(self.worker.x,
-                                                        self.worker.y,
-                                                        self.worker.colors)
+        self.worker.clean()
 
         size = 1.0
         if val := self.params.child('Размер точки').value():
             size = val
 
-        self.canvas.addItem(pg.ScatterPlotItem(x=self.xs,
-                                               y=self.ys,
+        self.canvas.addItem(pg.ScatterPlotItem(x=self.worker.x,
+                                               y=self.worker.y,
                                                size=size,
-                                               brush=self.colors))
+                                               brush=self.worker.colors))
 
         self.main_window.setWindowTitle('pyv DONE')
 
@@ -325,7 +321,10 @@ class Application:
             path += '.json'
 
         with open(path, 'w', encoding='utf-8') as file:
-            json.dump(self.params.saveState(), file)
+            json_data = {'params': self.params.saveState(),
+                         'params_exp': self.params_exp.saveState()}
+
+            json.dump(json_data, file, indent=4)
 
 
     def import_conf(self):
@@ -342,7 +341,10 @@ class Application:
             return
 
         with open(path, 'r', encoding='utf-8') as file:
-            self.params.restoreState(json.load(file))
+            json_data = json.load(file)
+
+            self.params.restoreState(json_data['params'])
+            self.params_exp.restoreState(json_data['params_exp'])
 
 
 if __name__ == '__main__':
