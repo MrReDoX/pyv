@@ -111,6 +111,12 @@ class Worker:
 
     def div_in_rel(self, vertex: Point3, cur: Point3, rel=1, inside=True) -> Point2:
         import mid
+
+        # parabolic and rel = 1
+        val = mid.u1(vertex, cur)**2 + mid.u2(vertex, cur)**2 - mid.u3(vertex, cur)**3
+        if abs(val) < 1e-4:
+            import mid_parab_second_type as mid
+
         if abs(rel) != 1:
             import mid_lambda as mid
 
@@ -133,18 +139,18 @@ class Worker:
         return answer
 
 
-    def profile(func):
-        """Decorator for run function profile"""
-        def wrapper(*args, **kwargs):
-            profile_filename = func.__name__ + '.prof'
-            profiler = cProfile.Profile()
-            result = profiler.runcall(func, *args, **kwargs)
-            profiler.dump_stats(profile_filename)
-            return result
-        return wrapper
+    # def profile(func):
+    #     """Decorator for run function profile"""
+    #     def wrapper(*args, **kwargs):
+    #         profile_filename = func.__name__ + '.prof'
+    #         profiler = cProfile.Profile()
+    #         result = profiler.runcall(func, *args, **kwargs)
+    #         profiler.dump_stats(profile_filename)
+    #         return result
+    #     return wrapper
 
 
-    @profile
+    # @profile
     def work(self, cnt: int, rel=1):
         def bounds(p: Point2) -> bool:
             return p.isfinite and self.xmin < p.x < self.xmax and self.ymin < p.y < self.ymax
