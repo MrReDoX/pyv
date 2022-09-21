@@ -1,5 +1,3 @@
-from math import inf, isfinite, sqrt
-
 from point import Point2, Point3
 
 

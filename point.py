@@ -6,14 +6,22 @@ class Point2:
         self.x = new_x
         self.y = new_y
 
+
     def __str__(self) -> str:
         return str((self.x, self.y))
+
+
+    def to_tuple(self):
+        return (self.x, self.y)
+
 
     def isfinite(self) -> bool:
         return all(map(isfinite, [self.x, self.y]))
 
+
     def to_point3(self, new_z: float):
         return Point3(self.x, self.y, new_z)
+
 
     def to_float(self):
         if isinstance(self.x, complex):
@@ -28,17 +36,29 @@ class Point3:
         self.y = new_y
         self.z = new_z
 
+
     def __str__(self) -> str:
         return f'({self.x}:{self.y}:{self.z})'
 
+
+    def __iter__(self):
+        return (self.__dict__[item] for item in sorted(self.__dict__))
+
+
+    def to_tuple(self):
+        return (self.x, self.y, self.z)
+
+
     def isfinite(self) -> bool:
         return all(map(isfinite, [self.x, self.y, self.z]))
+
 
     def to_point2(self) -> Point2:
         if self.z:
             return Point2(self.x / self.z, self.y / self.z)
 
         return Point2(self.x, self.y)
+
 
     def to_float(self):
         if isinstance(self.x, complex):

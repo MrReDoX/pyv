@@ -18,6 +18,7 @@ class Worker:
         self.coloring = True
         self.double_mid = False
         self.projective = 1
+        self.frame_type = 2
 
         self.xmin = -inf
         self.xmax = inf
@@ -77,16 +78,10 @@ class Worker:
 
 
     def guess_limits(self, contains_absolute=False) -> (float, float, float, float):
-        xmin = inf
-        xmax = -inf
+        xmin, ymin = inf, inf
+        xmax, ymax = -inf, -inf
 
-        ymin = inf
-        ymax = -inf
-
-        for i in self.vertices:
-            curx = i.to_point2().x
-            cury = i.to_point2().y
-
+        for (curx, cury) in [i.to_point2().to_tuple() for i in self.vertices]:
             xmin = min(xmin, curx)
             xmax = max(xmax, curx)
 
@@ -110,12 +105,23 @@ class Worker:
 
 
     def div_in_rel(self, vertex: Point3, cur: Point3, rel=1, inside=True) -> Point2:
+        # work with the frame type
+        # idea: just import required file
+
         import mid
 
+        if self.frame_type == 1:
+            import mid_first_type as mid
+
         # parabolic and rel = 1
+        # consider only 3 significant digits
         val = mid.u1(vertex, cur)**2 + mid.u2(vertex, cur)**2 - mid.u3(vertex, cur)**3
         if abs(val) < 1e-4:
-            import mid_parab_second_type as mid
+            # assume frame_type == 1
+            import mid_parab_first_type as mid
+
+            if self.frame_type == 2:
+                import mid_parab_second_type as mid
 
         if abs(rel) != 1:
             import mid_lambda as mid

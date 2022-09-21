@@ -92,6 +92,7 @@ class Application:
             dict(name='Цвет абсолюта', type='str', value='#ff0000'),
             dict(name='Количество точек', type='str', value='2**14'),
             dict(name='Размер точки', type='float', value=1.0),
+            dict(name='Тип репера', type='int', value=2),
             Parameter.create(name='Checker', type='file')
         ]
 
@@ -160,7 +161,6 @@ class Application:
         self.worker = Worker()
 
 
-
     def read_config(self):
         self.worker.vertices = parse_vertices(self.params.child('Вершины').value())
 
@@ -217,9 +217,12 @@ class Application:
             if val := self.params.child('Цвет абсолюта').value():
                 color = val
 
-            points = np.linspace(0, 2 * pi, num=200)
+            points = np.linspace(0, 2 * pi, num=100)
             circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color))
             self.canvas.addItem(circle)
+
+        if val := self.params.child('Тип репера').value():
+            self.worker.frame_type = val
 
 
     def plot(self):
