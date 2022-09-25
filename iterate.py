@@ -1,12 +1,12 @@
-from math import inf
+import cProfile
+from math import inf, isclose
 from random import choice, uniform
 
 import numpy as np
 from shapely.geometry import Point, Polygon
 
 from point import Point2, Point3
-
-import cProfile
+from utility import *
 
 
 class Worker:
@@ -19,6 +19,9 @@ class Worker:
         self.double_mid = False
         self.projective = 1
         self.frame_type = 2
+
+        self.precision = 1e-5
+        self.decimals = 4
 
         self.xmin = -inf
         self.xmax = inf
@@ -108,27 +111,28 @@ class Worker:
         # work with the frame type
         # idea: just import required file
 
-        import mid
+        import mid_first_type as mid
 
-        if self.frame_type == 1:
-            import mid_first_type as mid
-
-        # parabolic and rel = 1
-        # consider only 3 significant digits
-        val = mid.u1(vertex, cur)**2 + mid.u2(vertex, cur)**2 - mid.u3(vertex, cur)**3
-        if abs(val) < 1e-4:
+        val = u1(vertex, cur)**2 + u2(vertex, cur)**2 - u3(vertex, cur)**2
+        if isclose(abs(val), 0, rel_tol=self.precision):
             # assume frame_type == 1
             import mid_parab_first_type as mid
 
-            if self.frame_type == 2:
+        if self.frame_type == 2:
+            import mid_second_type as mid
+
+            val = 4 * u1(vertex, cur) * u2(vertex, cur) - u3(vertex, cur)**2
+            if isclose(abs(val), 0, rel_tol=self.precision):
                 import mid_parab_second_type as mid
 
-        if abs(rel) != 1:
-            import mid_lambda as mid
+        if not isclose(abs(rel), 1, rel_tol=self.precision):
+            import mid_first_lambda as mid
 
         x = mid.first_coord(vertex, cur, rel)
         y = mid.second_coord(vertex, cur, rel)
         z = mid.third_coord(vertex, cur, rel)
+
+        # print(x, y, z)
 
         answer = Point3(x, y, z).to_point2().to_float()
 
@@ -177,6 +181,8 @@ class Worker:
 
         cur = self.start_point.to_point3(self.projective)
 
+        print(cur)
+
         while len(xs) < cnt:
             vertex = choice(self.vertices)
             result = self.div_in_rel(vertex, cur, rel=rel)
@@ -194,8 +200,8 @@ class Worker:
         self._colors = np.array(colors)
 
     def clean(self):
-        self._x = np.round(self._x, decimals=3)
-        self._y = np.round(self._y, decimals=3)
+        self._x = np.round(self._x, decimals=self.decimals)
+        self._y = np.round(self._y, decimals=self.decimals)
 
         _, idx = np.unique(self._x + 1j * self._y, return_index=True)
 

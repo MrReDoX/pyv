@@ -1,34 +1,18 @@
-import matplotlib.pyplot as plt
-import numpy as np
+from point import Point3
+
+precision = 1e-5
+
+def u1(a: Point3, b: Point3) -> float:
+    return a.y * b.z - a.z * b.y
 
 
-def save_plot(x: np.ndarray,
-              y: np.ndarray,
-              file_name: str,
-              xlims: (float, float),
-              ylims: (float, float),
-              colors: np.ndarray,
-              vertices=None):
-    if len(x) < 1000:
-        return
+def u2(a: Point3, b: Point3) -> float:
+    return a.z * b.x - a.x * b.z
 
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color='red'))
-    plt.xlim(*xlims)
-    plt.ylim(*ylims)
 
-    vertices = [k.to_Point2() for k in vertices]
-    for k in range(len(vertices)):
-        x_values = [vertices[k].x, vertices[(k + 1) % len(vertices)].x]
-        y_values = [vertices[k].y, vertices[(k + 1) % len(vertices)].y]
+def u3(a: Point3, b: Point3) -> float:
+    return a.x * b.y - a.y * b.x
 
-        plt.plot(x_values, y_values, c='black', linewidth=1)
 
-    plt.scatter(x, y, c=colors, s=1/2, edgecolors='none')
-
-    plt.savefig(f'{file_name}', dpi=300)
-
-    plt.figure().clear()
-    plt.close()
-    plt.cla()
-    plt.clf()
+def delta(a: Point3, b: Point3) -> float:
+    return a.x * b.y + a.y * b.x

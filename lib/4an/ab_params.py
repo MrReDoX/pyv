@@ -2,9 +2,8 @@ import sys
 from math import sqrt
 
 import matplotlib.pyplot as plt
-from Point import Point2, Point3
-
 from Iterate import Worker
+from Point import Point2, Point3
 
 A, B = map(float, input('A, B: ').split())
 

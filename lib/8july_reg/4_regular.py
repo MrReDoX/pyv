@@ -4,9 +4,8 @@ from random import shuffle, uniform
 from time import sleep
 
 import numpy as np
-from Point import Point2, Point3
-
 from Iterate import Worker
+from Point import Point2, Point3
 # from Plotter import Plotter
 from Utility import save_plot
 

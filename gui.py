@@ -10,7 +10,7 @@ import json
 import os
 import sys
 import threading
-from math import inf, pi
+from math import ceil, inf, pi
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -21,6 +21,7 @@ from pyqtgraph.Qt import QtGui, QtWidgets
 
 from iterate import Worker
 from point import Point2, Point3
+
 
 # format: "(x, y)"
 def parse_m(data: str) -> Point2:
@@ -35,7 +36,7 @@ def parse_m(data: str) -> Point2:
 
 # format: "(x_1:y_1:z_1)\n(x_2:y_2:z_2)\n\dots\n(x_n:y_n:z_n)"
 def parse_vertices(data: str) -> list:
-    data = data.strip().replace(' ', '').split('\n')
+    data = data.strip().replace(' ', '').replace(',', '.').split('\n')
 
     # remove ( and )
     data = [i[1:-1] for i in data]
@@ -87,15 +88,18 @@ class Application:
             dict(name='Угадывать пределы', type='bool', value=False),
             dict(name='Угадывать пределы (включить абсолют)', type='bool', value=True),
             dict(name='Рисовать границы', type='bool', value=True),
-            dict(name='Ширина границ', type='float', value=3.0),
+            dict(name='Ширина границ', type='float', value=1.0),
             dict(name='Рисовать абсолют', type='bool', value=True),
             dict(name='Цвет абсолюта', type='str', value='#ff0000'),
             dict(name='Количество точек', type='str', value='2**14'),
             dict(name='Размер точки', type='float', value=1.0),
-            dict(name='Тип репера', type='int', value=2),
+            dict(name='Тип репера', type='int', value=1),
             Parameter.create(name='Checker', type='file')
         ]
 
+        # TODO: ширина линий вокруг треугольника
+        # ширина линий абсолюта
+        # размер точек
         children_exp = [
             dict(name='dpi', type='int', value=600)
         ]
@@ -212,17 +216,46 @@ class Application:
                                  pen=pg.mkPen('#000000',
                                  width=width))
 
+        if val := self.params.child('Тип репера').value():
+            self.worker.frame_type = val
+
         if self.params.child('Рисовать абсолют').value():
             color = '#ff0000'
             if val := self.params.child('Цвет абсолюта').value():
                 color = val
 
-            points = np.linspace(0, 2 * pi, num=100)
-            circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color))
-            self.canvas.addItem(circle)
+            if self.worker.frame_type == 1:
+                # Абсолют — окружность
+                points = np.linspace(0, 2 * pi, num=100)
+                circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color), skipFiniteCheck = True)
+                self.canvas.addItem(circle)
 
-        if val := self.params.child('Тип репера').value():
-            self.worker.frame_type = val
+            if self.worker.frame_type == 2:
+                # Абсолют — гипербола yx - 1 = 0
+                # 0 не содержится
+                left = xmin - 2
+                right = xmax + 2
+                cnt = ceil(abs(right - left) / 0.01)
+
+                if left * right > 0:
+                    # xs = np.linspace(xmin, xmax, ceil(abs(xmax - xmin) / 0.1))
+                    xs = np.linspace(left, right, cnt)
+                else:
+                    # xmin * xmax < 0, значит, ноль содержится
+                    # xs = np.linspace(xmin, bad_point, ceil(abs(xmin - bad_point) / 0.1))
+                    # np.append(xs, np.linspace(bad_point, xmax, ceil(abs(xmax - bad_point) / 0.1)))
+
+                    xs = np.linspace(0.1, right, cnt)
+                    ys = list(map(lambda x: 1 / x, xs))
+                    hyperbole = pg.PlotCurveItem(xs, ys, pen = pg.mkPen(color), skipFiniteCheck = True)
+                    self.canvas.addItem(hyperbole)
+
+                    xs = np.linspace(left, -0.1, cnt)
+
+                ys = list(map(lambda x: 1 / x, xs))
+
+                hyperbole = pg.PlotCurveItem(xs, ys, pen = pg.mkPen(color), skipFiniteCheck = True)
+                self.canvas.addItem(hyperbole)
 
 
     def plot(self):
@@ -264,19 +297,44 @@ class Application:
             if val := self.params.child('Цвет абсолюта').value():
                 color = val
 
-            plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color=color))
+            if self.worker.frame_type == 1:
+                plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color=color, linewidth=0.25))
 
-        plt.xlim(self.worker.xmin, self.worker.xmax)
-        plt.ylim(self.worker.ymin, self.worker.ymax)
+            if self.worker.frame_type == 2:
+                # Абсолют — гипербола yx - 1 = 0
+                # 0 не содержится
+                left = self.worker.xmin - 2
+                right = self.worker.xmax + 2
+                cnt = ceil(abs(right - left) / 0.01)
+
+                if left * right > 0:
+                    # xs = np.linspace(xmin, xmax, ceil(abs(xmax - xmin) / 0.1))
+                    xs = np.linspace(left, right, cnt)
+                else:
+                    # xmin * xmax < 0, значит, ноль содержится
+                    # xs = np.linspace(xmin, bad_point, ceil(abs(xmin - bad_point) / 0.1))
+                    # np.append(xs, np.linspace(bad_point, xmax, ceil(abs(xmax - bad_point) / 0.1)))
+
+                    xs = np.linspace(0.1, right, cnt)
+                    ys = list(map(lambda x: 1 / x, xs))
+                    plt.plot(xs, ys, c=color, linewidth=0.25)
+
+                    xs = np.linspace(left, -0.1, cnt)
+
+                ys = list(map(lambda x: 1 / x, xs))
+                plt.plot(xs, ys, c=color, linewidth=0.25)
+
+        plt.xlim(self.worker.xmin - 2, self.worker.xmax + 2)
+        plt.ylim(self.worker.ymin - 2, self.worker.ymax + 2)
 
         if self.params.child('Рисовать границы').value():
             width = 1.0
-            # if value := params.child('Ширина границ').value():
-            #     width = value / 2
+            if value := self.params.child('Ширина границ').value():
+                width = value / 4
 
             tmp = [i.to_point2() for i in self.worker.vertices + [self.worker.vertices[0]]]
             for cur, nex in itertools.pairwise(tmp):
-                plt.plot([cur.x, nex.x], [cur.y, nex.y], c='black', linewidth=width)
+                plt.plot([cur.x, nex.x], [cur.y, nex.y], c='black', linewidth=0.25)
 
         size = 1.0
         # if val := params.child('Размер точки').value():
@@ -288,17 +346,24 @@ class Application:
             directory=os.getcwd(),
         )
 
+        # _, file_extension = os.path.splitext(path)
+
         file_name = os.path.basename(path)
 
         if not file_name:
+            self.main_window.setWindowTitle('pyv DONE')
+
             return
 
         dpi = 600
         if val := self.params_exp.child('dpi').value():
             dpi = val
 
-        plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size/2, edgecolors='none')
-        plt.savefig(file_name, dpi=dpi)
+        # TODO: add option to enable, disable axis
+        plt.axis('off')
+
+        plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size/4, edgecolors='none')
+        plt.savefig(path, dpi=dpi)
 
         plt.close()
         plt.cla()

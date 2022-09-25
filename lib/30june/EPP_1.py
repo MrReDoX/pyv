@@ -2,10 +2,9 @@ import math
 import sys
 
 import numpy as np
-from Point import Point2, Point3
-
 from Iterate import Worker
 from Plotter import Plotter
+from Point import Point2, Point3
 from Utility import save_plot
 
 
