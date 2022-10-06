@@ -20,8 +20,8 @@ class Worker:
         self.projective = 1
         self.frame_type = 2
 
-        self.precision = 1e-5
-        self.decimals = 4
+        self.precision = 1e-4
+        self.decimals = 3
 
         self.xmin = -inf
         self.xmax = inf

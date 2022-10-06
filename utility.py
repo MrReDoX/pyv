@@ -1,6 +1,6 @@
 from point import Point3
 
-precision = 1e-5
+precision = 1e-4
 
 def u1(a: Point3, b: Point3) -> float:
     return a.y * b.z - a.z * b.y

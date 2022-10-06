@@ -84,7 +84,7 @@ class Application:
             dict(name='lambda', type='float', value=1.0),
             dict(name='projective', type='float', value=1.0),
             dict(name='Рисовать вторую середину', type='bool', value=False),
-            dict(name='Пределы', type='str', value=''),
+            dict(name='Пределы', type='str', value='-2, 5, -3, 6'),
             dict(name='Угадывать пределы', type='bool', value=False),
             dict(name='Угадывать пределы (включить абсолют)', type='bool', value=True),
             dict(name='Рисовать границы', type='bool', value=True),
@@ -97,11 +97,15 @@ class Application:
             Parameter.create(name='Checker', type='file')
         ]
 
-        # TODO: ширина линий вокруг треугольника
-        # ширина линий абсолюта
-        # размер точек
         children_exp = [
-            dict(name='dpi', type='int', value=600)
+            dict(name='dpi', type='int', value=600),
+            dict(name='Имя файла', type='str', value=''),
+            dict(name='Директория по умолчанию', type='str', value=os.getcwd()),
+            dict(name='Расширение по умолчанию', type='str', value='eps'),
+            dict(name='Ширина линий абсолюта', type='float', value=0.25),
+            dict(name='Ширина границ', type='float', value=0.25),
+            dict(name='Размер точки', type='float', value=0.25),
+            dict(name='Рисовать оси', type='bool', value=False)
         ]
 
         self.params = Parameter.create(name='Параметры', type='group', children=children)
@@ -297,8 +301,14 @@ class Application:
             if val := self.params.child('Цвет абсолюта').value():
                 color = val
 
+            linewidth = 0.25
+            if val := self.params_exp.child('Ширина линий абсолюта').value():
+                linewidth = val
+
             if self.worker.frame_type == 1:
-                plt.gca().add_patch(plt.Circle((0, 0), 1, fill=False, color=color, linewidth=0.25))
+                par = {'fill': False, 'color': color, 'linewidth': linewidth}
+
+                plt.gca().add_patch(plt.Circle((0, 0), 1, **par))
 
             if self.worker.frame_type == 2:
                 # Абсолют — гипербола yx - 1 = 0
@@ -315,40 +325,55 @@ class Application:
                     # xs = np.linspace(xmin, bad_point, ceil(abs(xmin - bad_point) / 0.1))
                     # np.append(xs, np.linspace(bad_point, xmax, ceil(abs(xmax - bad_point) / 0.1)))
 
-                    xs = np.linspace(0.1, right, cnt)
+                    xs = np.linspace(0.01, right, cnt)
                     ys = list(map(lambda x: 1 / x, xs))
-                    plt.plot(xs, ys, c=color, linewidth=0.25)
+                    plt.plot(xs, ys, c=color, linewidth=linewidth)
 
-                    xs = np.linspace(left, -0.1, cnt)
+                    xs = np.linspace(left, -0.01, cnt)
 
                 ys = list(map(lambda x: 1 / x, xs))
-                plt.plot(xs, ys, c=color, linewidth=0.25)
+                plt.plot(xs, ys, c=color, linewidth=linewidth)
 
         plt.xlim(self.worker.xmin - 2, self.worker.xmax + 2)
         plt.ylim(self.worker.ymin - 2, self.worker.ymax + 2)
 
         if self.params.child('Рисовать границы').value():
-            width = 1.0
-            if value := self.params.child('Ширина границ').value():
-                width = value / 4
+            width = 0.25
+            if value := self.params_exp.child('Ширина границ').value():
+                width = value
 
             tmp = [i.to_point2() for i in self.worker.vertices + [self.worker.vertices[0]]]
             for cur, nex in itertools.pairwise(tmp):
-                plt.plot([cur.x, nex.x], [cur.y, nex.y], c='black', linewidth=0.25)
+                plt.plot([cur.x, nex.x], [cur.y, nex.y], c='black', linewidth=width)
 
         size = 1.0
-        # if val := params.child('Размер точки').value():
-        #     size = val
+        if val := self.params_exp.child('Размер точки').value():
+             size = val
+
+        directory = os.getcwd()
+        if value := self.params_exp.child('Директория по умолчанию').value():
+            directory = value
+
+        file_name = f'/{self.params.child("Количество точек").value()}'
+        for i in self.worker.vertices:
+            file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
+
+        if val := self.params_exp.child('Имя файла').value():
+            file_name = val
+
+        extension = 'eps'
+        if value := self.params_exp.child('Расширение по умолчанию').value():
+            extension = value
+
+        directory += f'/{file_name}.{extension}'
 
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             parent=self.main_window,
             caption='Выберите файл',
-            directory=os.getcwd(),
+            directory=directory
         )
 
-        # _, file_extension = os.path.splitext(path)
-
-        file_name = os.path.basename(path)
+        directory, file_name = os.path.split(path)
 
         if not file_name:
             self.main_window.setWindowTitle('pyv DONE')
@@ -359,11 +384,12 @@ class Application:
         if val := self.params_exp.child('dpi').value():
             dpi = val
 
-        # TODO: add option to enable, disable axis
-        plt.axis('off')
+        value = self.params_exp.child('Рисовать оси').value()
+        d = {False: 'off', True: 'on'}
+        plt.axis(d[value])
 
-        plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size/4, edgecolors='none')
-        plt.savefig(path, dpi=dpi)
+        plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size, edgecolors='none')
+        plt.savefig(f'{directory}/{file_name}', dpi=dpi)
 
         plt.close()
         plt.cla()
