@@ -1,6 +1,6 @@
 # pyv
 
-Cool description
+Chaos game simulator
 
 # regular $ n $-gon
 
@@ -18,3 +18,5 @@ points = [c + 2 * cmath.exp(1j * (2 * math.pi * k) / n) for k in range(n)]
 for z in points:
     print(f'({z.real:.2f}:{z.imag:.2f}:1)')
 ```
+
+Output:
