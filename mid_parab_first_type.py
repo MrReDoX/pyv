@@ -1,5 +1,5 @@
 from point import Point3
-from utility import *
+from utility import u1, u2, u3
 
 
 def first_coord(a: Point3, b: Point3, eps=1) -> float:

@@ -1,7 +1,7 @@
 from math import inf, isclose, isfinite, sqrt
 
 from point import Point2, Point3
-from utility import *
+from utility import PRECISION, u1, u2, u3
 
 
 def omega(a: Point3, b: Point3) -> float:
@@ -15,7 +15,7 @@ def omega(a: Point3, b: Point3) -> float:
 
     bot = a.y**2 * t1 - b.y**2 * t2
 
-    if isclose(abs(bot), 0, rel_tol=precision):
+    if isclose(abs(bot), 0, rel_tol=PRECISION):
         return inf
 
     return top / bot
@@ -27,7 +27,7 @@ def omega_u3(a: Point3, b: Point3) -> float:
 
     bot = u1_val * (a.y * b.z + a.z * b.y)
 
-    if isclose(abs(bot), 0, rel_tol=precision):
+    if isclose(abs(bot), 0, rel_tol=PRECISION):
         return inf
 
     return (a.y * b.y * (u1_val**2 + u2_val**2) + a.z * b.z * u1_val**2) / bot
@@ -44,7 +44,7 @@ def theta(a: Point3, b: Point3) -> float:
 
     bot = a.y**2 * t1 - b.y**2 * t2
 
-    if isclose(abs(bot), 0, rel_tol=precision):
+    if isclose(abs(bot), 0, rel_tol=PRECISION):
         return inf
 
     return top / bot
@@ -53,7 +53,7 @@ def theta(a: Point3, b: Point3) -> float:
 def first_coord(a: Point3, b: Point3, eps=1) -> float:
     u3_val = u3(a, b)
 
-    if not isclose(abs(u3_val), 0, rel_tol=precision):
+    if not isclose(abs(u3_val), 0, rel_tol=PRECISION):
         Omega = omega(a, b)
 
         underroot = Omega**2 - theta(a, b)
@@ -70,7 +70,7 @@ def first_coord(a: Point3, b: Point3, eps=1) -> float:
 def second_coord(a: Point3, b: Point3, eps=1) -> float:
     u3_val = u3(a, b)
 
-    if not isclose(abs(u3_val), 0, rel_tol=precision):
+    if not isclose(abs(u3_val), 0, rel_tol=PRECISION):
         return u3_val
 
     return u1(a, b)
@@ -79,7 +79,7 @@ def second_coord(a: Point3, b: Point3, eps=1) -> float:
 def third_coord(a: Point3, b: Point3, eps=1) -> float:
     u3_val = u3(a, b)
 
-    if not isclose(abs(u3_val), 0, rel_tol=precision):
+    if not isclose(abs(u3_val), 0, rel_tol=PRECISION):
         Omega = omega(a, b)
         underroot = Omega**2 - theta(a, b)
 

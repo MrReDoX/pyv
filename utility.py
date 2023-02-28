@@ -1,18 +1,21 @@
+"""Widely used functions firstnd precision setting for is_close."""
+
 from point import Point3
 
-precision = 1e-4
-
-def u1(a: Point3, b: Point3) -> float:
-    return a.y * b.z - a.z * b.y
+PRECISION = 1e-4
 
 
-def u2(a: Point3, b: Point3) -> float:
-    return a.z * b.x - a.x * b.z
+def u1(first: Point3, second: Point3) -> float:
+    return first.y * second.z - first.z * second.y
 
 
-def u3(a: Point3, b: Point3) -> float:
-    return a.x * b.y - a.y * b.x
+def u2(first: Point3, second: Point3) -> float:
+    return first.z * second.x - first.x * second.z
 
 
-def delta(a: Point3, b: Point3) -> float:
-    return a.x * b.y + a.y * b.x
+def u3(first: Point3, second: Point3) -> float:
+    return first.x * second.y - first.y * second.x
+
+
+def delta(first: Point3, second: Point3) -> float:
+    return first.x * second.y + first.y * second.x

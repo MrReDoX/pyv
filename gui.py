@@ -1,9 +1,4 @@
-# TODO
-# Рисовать точку за точкой?
-# status bar?
-# Iterate.py: x -> xs, y -> ys
-
-# https://pyqtgraph.readthedocs.io/en/latest/parametertree/parametertypes.html
+"""Main program module. Builds GUI and run program."""
 
 import itertools
 import json
@@ -23,8 +18,8 @@ from iterate import Worker
 from point import Point2, Point3
 
 
-# format: "(x, y)"
 def parse_m(data: str) -> Point2:
+    """Parse point data from text box in format (x, y)."""
     if not data:
         return Point2(inf, inf)
 
@@ -34,8 +29,8 @@ def parse_m(data: str) -> Point2:
     return Point2(data[0], data[1])
 
 
-# format: "(x_1:y_1:z_1)\n(x_2:y_2:z_2)\n\dots\n(x_n:y_n:z_n)"
 def parse_vertices(data: str) -> list:
+    """Parse vertices data from text box in format "(x_1:y_1:z_1)\n...\n(x_n:y_n:z_n)"."""
     data = data.strip().replace(' ', '').replace(',', '.').split('\n')
 
     # remove ( and )
@@ -49,6 +44,7 @@ def parse_vertices(data: str) -> list:
 
 # format: "#HEX1, #HEX2, ..., #HEX3"
 def parse_colors(data: str) -> list:
+    """Parse colors data from text box in format ""#HEX1, #HEX2, ..., #HEXn"."""
     if not data:
         return []
 
@@ -58,8 +54,8 @@ def parse_colors(data: str) -> list:
     return [f'{i}' for i in data]
 
 
-# format: "xmin, xmax, ymin, ymax"
 def parse_limits(data: str) -> (float, float, float, float):
+    """Parse limits data from text box in format "xmin, xmax, ymin, ymax"."""
     if not data:
         return (inf, inf, inf, inf)
 
@@ -69,6 +65,8 @@ def parse_limits(data: str) -> (float, float, float, float):
 
 
 class Application:
+    """Main class that build GUI."""
+
     def __init__(self):
         pg.setConfigOptions(antialias=True)
         self.app = pg.mkQApp('pyv')
@@ -170,6 +168,7 @@ class Application:
 
 
     def read_config(self):
+        """Read GUI settings and write them to variables."""
         self.worker.vertices = parse_vertices(self.params.child('Вершины').value())
 
         self.worker.start_point = parse_m(self.params.child('Стартовая точка').value())
@@ -231,7 +230,10 @@ class Application:
             if self.worker.frame_type == 1:
                 # Абсолют — окружность
                 points = np.linspace(0, 2 * pi, num=100)
-                circle = pg.PlotCurveItem(np.cos(points), np.sin(points), pen = pg.mkPen(color), skipFiniteCheck = True)
+                circle = pg.PlotCurveItem(np.cos(points),\
+                                          np.sin(points),\
+                                          pen = pg.mkPen(color),\
+                                          skipFiniteCheck=True)
                 self.canvas.addItem(circle)
 
             if self.worker.frame_type == 2:
@@ -243,26 +245,33 @@ class Application:
 
                 if left * right > 0:
                     # xs = np.linspace(xmin, xmax, ceil(abs(xmax - xmin) / 0.1))
-                    xs = np.linspace(left, right, cnt)
+                    x_coords = np.linspace(left, right, cnt)
                 else:
                     # xmin * xmax < 0, значит, ноль содержится
                     # xs = np.linspace(xmin, bad_point, ceil(abs(xmin - bad_point) / 0.1))
                     # np.append(xs, np.linspace(bad_point, xmax, ceil(abs(xmax - bad_point) / 0.1)))
 
-                    xs = np.linspace(0.1, right, cnt)
-                    ys = list(map(lambda x: 1 / x, xs))
-                    hyperbole = pg.PlotCurveItem(xs, ys, pen = pg.mkPen(color), skipFiniteCheck = True)
+                    x_coords = np.linspace(0.1, right, cnt)
+                    y_coords = list(map(lambda x: 1 / x, x_coords))
+                    hyperbole = pg.PlotCurveItem(x_coords,\
+                                                 y_coords,\
+                                                 pen=pg.mkPen(color),\
+                                                 skipFiniteCheck=True)
                     self.canvas.addItem(hyperbole)
 
-                    xs = np.linspace(left, -0.1, cnt)
+                    x_coords = np.linspace(left, -0.1, cnt)
 
-                ys = list(map(lambda x: 1 / x, xs))
+                y_coords = list(map(lambda x: 1 / x, x_coords))
 
-                hyperbole = pg.PlotCurveItem(xs, ys, pen = pg.mkPen(color), skipFiniteCheck = True)
+                hyperbole = pg.PlotCurveItem(x_coords,\
+                                             y_coords,\
+                                             pen=pg.mkPen(color),\
+                                             skipFiniteCheck=True)
                 self.canvas.addItem(hyperbole)
 
 
     def plot(self):
+        """Run chaos game and plot with scatterplot."""
         self.main_window.setWindowTitle('pyv BUSY')
         self.win.clear()
 
@@ -292,6 +301,7 @@ class Application:
 
 
     def export(self):
+        """Export image file with matplotlib."""
         self.main_window.setWindowTitle('pyv EXPORTING')
 
         plt.gca().set_aspect('equal', adjustable='box')
@@ -306,9 +316,15 @@ class Application:
                 linewidth = val
 
             if self.worker.frame_type == 1:
-                par = {'fill': False, 'color': color, 'linewidth': linewidth}
+                # Don't work?
+                # par = {'fill': False, 'color': color, 'linewidth': linewidth}
+                # plt.gca().add_patch(plt.Circle((0, 0), 1, **par))
+                par = {'color': color, 'linewidth': linewidth}
+                theta = np.linspace(0, 2 * np.pi, 2**10)
+                x_coords = np.cos(theta)
+                y_coords = np.sin(theta)
+                plt.plot(x_coords, y_coords, **par)
 
-                plt.gca().add_patch(plt.Circle((0, 0), 1, **par))
 
             if self.worker.frame_type == 2:
                 # Абсолют — гипербола yx - 1 = 0
@@ -319,20 +335,20 @@ class Application:
 
                 if left * right > 0:
                     # xs = np.linspace(xmin, xmax, ceil(abs(xmax - xmin) / 0.1))
-                    xs = np.linspace(left, right, cnt)
+                    x_coords = np.linspace(left, right, cnt)
                 else:
                     # xmin * xmax < 0, значит, ноль содержится
                     # xs = np.linspace(xmin, bad_point, ceil(abs(xmin - bad_point) / 0.1))
                     # np.append(xs, np.linspace(bad_point, xmax, ceil(abs(xmax - bad_point) / 0.1)))
 
-                    xs = np.linspace(0.01, right, cnt)
-                    ys = list(map(lambda x: 1 / x, xs))
-                    plt.plot(xs, ys, c=color, linewidth=linewidth)
+                    x_coords = np.linspace(0.01, right, cnt)
+                    y_coords = list(map(lambda x: 1 / x, x_coords))
+                    plt.plot(x_coords, y_coords, c=color, linewidth=linewidth)
 
-                    xs = np.linspace(left, -0.01, cnt)
+                    x_coords = np.linspace(left, -0.01, cnt)
 
-                ys = list(map(lambda x: 1 / x, xs))
-                plt.plot(xs, ys, c=color, linewidth=linewidth)
+                y_coords = list(map(lambda x: 1 / x, x_coords))
+                plt.plot(x_coords, y_coords, c=color, linewidth=linewidth)
 
         plt.xlim(self.worker.xmin - 2, self.worker.xmax + 2)
         plt.ylim(self.worker.ymin - 2, self.worker.ymax + 2)
@@ -348,15 +364,21 @@ class Application:
 
         size = 1.0
         if val := self.params_exp.child('Размер точки').value():
-             size = val
+            size = val
 
         directory = os.getcwd()
         if value := self.params_exp.child('Директория по умолчанию').value():
             directory = value
 
-        file_name = f'/{self.params.child("Количество точек").value()}'
+        # TODO: add option for adding number of points to the beginning
+        # TODO: add option for adding lambda to the beginning
+        # file_name = f'{self.params.child("Количество точек").value()}'
+        # for i in self.worker.vertices:
+        #     file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
+        file_name = f'{self.params.child("lambda").value()}'
         for i in self.worker.vertices:
             file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
+        # file_name = file_name[1:]
 
         if val := self.params_exp.child('Имя файла').value():
             file_name = val
@@ -385,10 +407,17 @@ class Application:
             dpi = val
 
         value = self.params_exp.child('Рисовать оси').value()
-        d = {False: 'off', True: 'on'}
-        plt.axis(d[value])
+        yes_or_no = {False: 'off', True: 'on'}
+        plt.axis(yes_or_no[value])
 
-        plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size, edgecolors='none')
+        # TODO: add rasterization as parameter
+        plt.scatter(self.worker.x,
+                    self.worker.y,
+                    c=self.worker.colors,
+                    s=size,
+                    edgecolors='none',
+                    rasterized=True)
+        # plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size, edgecolors='none')
         plt.savefig(f'{directory}/{file_name}', dpi=dpi)
 
         plt.close()
@@ -399,6 +428,7 @@ class Application:
 
 
     def export_conf(self):
+        """Write current configuration to the JSON file."""
         filt = 'Json File (*.json)'
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             parent=self.main_window,
@@ -422,6 +452,7 @@ class Application:
 
 
     def import_conf(self):
+        """Read parameters trees from the JSON file."""
         filt = 'Json File (*.json)'
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             parent=self.main_window,
