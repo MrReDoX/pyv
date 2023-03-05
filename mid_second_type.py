@@ -1,19 +1,21 @@
-from math import inf, isclose, isfinite, sqrt
+"""Formulas for the second frame type with lambda = 1."""
+
+from math import inf, isclose, sqrt
 
 from point import Point3
-from utility import PRECISION, u1, u2, u3, delta
+from utility import PRECISION, delta, u1, u2, u3
 
 
 def omega(a: Point3, b: Point3) -> float:
-    VAL1 = b.x * b.y - b.z**2
-    VAL2 = a.x * a.y - a.z**2
+    val1 = b.x * b.y - b.z**2
+    val2 = a.x * a.y - a.z**2
 
-    bot = a.y**2 * VAL1 - b.y**2 * VAL2
+    bot = a.y**2 * val1 - b.y**2 * val2
 
     if isclose(abs(bot), 0, rel_tol=PRECISION):
         return inf
 
-    return (a.x * a.y * VAL1 - b.x * b.y * VAL2) / bot
+    return (a.x * a.y * val1 - b.x * b.y * val2) / bot
 
 
 def omega_u3(a: Point3, b: Point3) -> float:
@@ -22,62 +24,56 @@ def omega_u3(a: Point3, b: Point3) -> float:
 
 
 def theta(a: Point3, b: Point3) -> float:
-    U1 = u1(a, b)
-    U2 = u2(a, b)
-    U3 = u3(a, b)
-    DELTA = delta(a, b)
-    VAL = (2 * U1 * U2 - U3**2)
+    u_1 = u1(a, b)
+    u_2 = u2(a, b)
+    u_3 = u3(a, b)
+    val = (2 * u_1 * u_2 - u_3**2)
 
-    bot = DELTA * U1**2 + a.y * b.y * VAL
+    bot = delta(a, b) * u_1**2 + a.y * b.y * val
 
     if isclose(abs(bot), 0, rel_tol=PRECISION):
         return inf
 
-    return -(DELTA * U2**2 + a.x * b.x * VAL) / bot
+    return -(delta(a, b) * u_2**2 + a.x * b.x * val) / bot
 
 
 def first_coord(a: Point3, b: Point3, eps=1) -> float:
-    u3_val = u3(a, b)
-
-    if not isclose(abs(u3_val), 0, rel_tol=PRECISION):
-        omega_val = omega(a, b)
-        underroot = omega_val**2 - theta(a, b)
+    """Get first coordinate of point or ∞ if something bad."""
+    if not isclose(abs(u3(a, b)), 0, rel_tol=PRECISION):
+        underroot = omega(a, b)**2 - theta(a, b)
 
         if underroot < 0:
             return inf
 
-        return u3_val * (omega_val + eps * sqrt(underroot))
+        return u3(a, b) * (omega(a, b) + eps * sqrt(underroot))
 
     # u3 ~ 0
     return -u2(a, b)
 
 
 def second_coord(a: Point3, b: Point3, eps=1) -> float:
-    u3_val = u3(a, b)
-
-    if not isclose(abs(u3_val), 0, rel_tol=PRECISION):
-        return u3_val
+    """Get second coordinate of point or ∞ if something bad."""
+    if not isclose(abs(u3(a, b)), 0, rel_tol=PRECISION):
+        return u3(a, b)
 
     # u3 ~ 0
     return u1(a, b)
 
-def third_coord(a: Point3, b: Point3, eps=1) -> float:
-    u3_val = u3(a, b)
 
-    if not isclose(abs(u3_val), 0, rel_tol=PRECISION):
-        omega_val = omega(a, b)
-        underroot = omega_val**2 - theta(a, b)
+def third_coord(a: Point3, b: Point3, eps=1) -> float:
+    """Get third coordinate of point or ∞ if something bad."""
+    if not isclose(abs(u3(a, b)), 0, rel_tol=PRECISION):
+        underroot = omega(a, b)**2 - theta(a, b)
 
         if underroot < 0:
             return inf
 
-        return -u1(a, b) * (omega_val + eps * sqrt(underroot)) - u2(a, b)
+        return -u1(a, b) * (omega(a, b) + eps * sqrt(underroot)) - u2(a, b)
 
     # u3 ~ 0
-    omega_val = omega_u3(a, b)
-    underroot = omega_val**2 + u1(a, b) * u2(a, b)
+    underroot = omega_u3(a, b)**2 + u1(a, b) * u2(a, b)
 
     if underroot < 0:
         return inf
 
-    return omega_val + eps * sqrt(underroot)
+    return omega_u3(a, b) + eps * sqrt(underroot)

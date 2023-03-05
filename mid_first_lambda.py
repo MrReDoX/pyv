@@ -1,137 +1,104 @@
+"""Formulas for the first frame type with lambda ≠ 1."""
+
 import cmath
 import math
 
 from point import Point3
-
-
-def u1(a: Point3, b: Point3) -> float:
-    return a.y * b.z - a.z * b.y
-
-
-def u2(a: Point3, b: Point3) -> float:
-    return a.z * b.x - a.x * b.z
-
-
-def u3(a: Point3, b: Point3) -> float:
-    answer = a.x * b.y - a.y * b.x
-
-    if not answer:
-        return math.inf
-
-    return answer
+from utility import PRECISION, u1, u2, u3
 
 
 def k(a: Point3, b: Point3) -> float:
-    U1 = u1(a, b)
-    U3 = u3(a, b)
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
+        return cmath.inf
 
-    if not math.isfinite(U3):
-        return math.inf
-
-    return U1**2 - U3**2
+    return u1(a, b)**2 - u3(a, b)**2
 
 
 def k1(a: Point3, b: Point3) -> complex:
-    U1 = u1(a, b)
-    U2 = u2(a, b)
-    U3 = u3(a, b)
+    u_1 = u1(a, b)
+    u_2 = u2(a, b)
+    u_3 = u3(a, b)
 
-    if not cmath.isfinite(U3):
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    s1 = -U1 * U2
-    s2 = U3 * cmath.sqrt(U1**2 + U2**2 - U3**2)
+    first_summand = -u_1 * u_2
+    second_summand = u_3 * cmath.sqrt(u_1**2 + u_2**2 - u_3**2)
 
-    return s1 + s2
+    return first_summand + second_summand
 
 
 def k2(a: Point3, b: Point3) -> complex:
-    U1 = u1(a, b)
-    U2 = u2(a, b)
-    U3 = u3(a, b)
+    u_1 = u1(a, b)
+    u_2 = u2(a, b)
+    u_3 = u3(a, b)
 
-    if not cmath.isfinite(U3):
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    s1 = -U1 * U2
-    s2 = U3 * cmath.sqrt(U1**2 + U2**2 - U3**2)
+    first_summand = -u_1 * u_2
+    second_summand = u_3 * cmath.sqrt(u_1**2 + u_2**2 - u_3**2)
 
-    return s1 - s2
+    return first_summand - second_summand
 
 
 def omega1(a: Point3, b: Point3, coeff: float) -> complex:
-    K1 = k1(a, b)
-    K = k(a, b)
-
-    if not all(map(cmath.isfinite, [K1, K])):
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    m1 = a.x * K - a.y * K1
-    m2 = b.x * K - b.y * K1
+    base1 = a.x * k(a, b) - a.y * k1(a, b)
+    base2 = b.x * k(a, b) - b.y * k1(a, b)
 
-    if not m1 * m2:
+    if math.isclose(abs(base1 * base2), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    return m1**(1 / (1 + coeff)) * m2**(coeff / (1 + coeff))
+    return base1**(1 / (1 + coeff)) * base2**(coeff / (1 + coeff))
 
 
-def omega2(a: Point3, b: Point3, coeff: float) -> float:
-    K2 = k2(a, b)
-    K = k(a, b)
-
-    if not all(map(cmath.isfinite, [K2, K])):
+def omega2(a: Point3, b: Point3, coeff: float) -> complex:
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    m1 = a.x * K - a.y * K2
-    m2 = b.x * K - b.y * K2
+    base1 = a.x * k(a, b) - a.y * k2(a, b)
+    base2 = b.x * k(a, b) - b.y * k2(a, b)
 
-    if not m1 * m2:
+    if math.isclose(abs(base1 * base2), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    return m1**(1 / (1 + coeff)) * m2**(coeff / (1 + coeff))
+    return base1**(1 / (1 + coeff)) * base2**(coeff / (1 + coeff))
 
 
 def first_coord(a: Point3, b: Point3, coeff: float) -> complex:
-    U3 = u3(a, b)
-    K1 = k1(a, b)
-    K2 = k2(a, b)
-    Omega1 = omega1(a, b, coeff)
-    Omega2 = omega2(a, b, coeff)
+    """Get first coordinate of point or ∞ if something bad."""
+    omega_1 = omega1(a, b, coeff)
+    omega_2 = omega2(a, b, coeff)
 
-    vals = [U3, K1, K2, Omega1, Omega2]
-    if not all(map(cmath.isfinite, vals)):
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    return U3 * (K2 * Omega1 - K1 * Omega2)
+    return u3(a, b) * (k2(a, b) * omega_1 - k1(a, b) * omega_2)
 
 
 def second_coord(a: Point3, b: Point3, coeff: float) -> complex:
-    U3 = u3(a, b)
-    K = k(a, b)
-    Omega1 = omega1(a, b, coeff)
-    Omega2 = omega2(a, b, coeff)
+    """Get second coordinate of point or ∞ if something bad."""
+    omega_1 = omega1(a, b, coeff)
+    omega_2 = omega2(a, b, coeff)
 
-    vals = [U3, K, Omega1, Omega2]
-    if not all(map(cmath.isfinite, vals)):
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    return U3 * K * (Omega1 - Omega2)
+    return u3(a, b) * k(a, b) * (omega_1 - omega_2)
 
 
 def third_coord(a: Point3, b: Point3, coeff: float) -> complex:
-    U1 = u1(a, b)
-    U2 = u2(a, b)
-    K = k(a, b)
-    K1 = k1(a, b)
-    K2 = k2(a, b)
-    Omega1 = omega1(a, b, coeff)
-    Omega2 = omega2(a, b, coeff)
+    """Get third coordinate of point or ∞ if something bad."""
+    omega_1 = omega1(a, b, coeff)
+    omega_2 = omega2(a, b, coeff)
 
-    vals = [U1, U2, K, K1, K2, Omega1, Omega2]
-    if not all(map(cmath.isfinite, vals)):
+    if cmath.isclose(u3(a, b), 0, rel_tol=PRECISION):
         return cmath.inf
 
-    s1 = Omega2 * (U1 * K1 + U2 * K)
-    s2 = Omega1 * (U1 * K2 + U2 * K)
+    first_summand = omega_2 * (u1(a, b) * k1(a, b) + u2(a, b) * k(a, b))
+    second_summand = omega_1 * (u1(a, b) * k2(a, b) + u2(a, b) * k(a, b))
 
-    return s1 - s2
+    return first_summand - second_summand

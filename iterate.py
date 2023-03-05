@@ -3,12 +3,14 @@
 # import cProfile
 from math import inf, isclose
 from random import choice, uniform
+from typing import List, Tuple
 
 import numpy as np
 from shapely.geometry import Point, Polygon
 
 from point import Point2, Point3
 from utility import PRECISION, u1, u2, u3
+
 
 class Worker:
     """Main class that «plays» chaos game with settings."""
@@ -39,23 +41,26 @@ class Worker:
     @property
     def x(self) -> list:
         """Getter for x coordinates of chaos game points."""
-        return self._x
+        return list(self._x)
 
     @property
     def y(self) -> list:
         """Getter for y coordinates of chaos game points."""
-        return self._y
+        return list(self._y)
 
     @property
     def colors(self) -> list:
         """Getter for colors of chaos game points."""
-        return self._colors
+        return list(self._colors)
 
     @vertices.setter
     def vertices(self, value):
         """Setter for vertices. Builds shapely polygon when points are set."""
         self._vertices = value
-        self.poly = Polygon([(i.to_point2().x, i.to_point2().y) for i in self.vertices])
+
+        pairs = [(i.to_point2().x, i.to_point2().y) for i in self.vertices]
+
+        self.poly = Polygon(pairs)
 
     def gen_random_colors(self) -> list:
         """Generating random colors in format #123456 for each vertex."""
@@ -67,7 +72,6 @@ class Worker:
         answer = [gen() for i in range(len(self.vertices))]
 
         return answer
-
 
     # TODO: rewrite using cp algorithm
     # https://cp-algorithms.com/geometry/point-in-convex-polygon.html
@@ -89,8 +93,7 @@ class Worker:
 
         return Point2(x, y)
 
-
-    def guess_limits(self, contains_absolute=False) -> (float, float, float, float):
+    def guess_limits(self, contains_absolute=False) -> Tuple[float, float, float, float]:
         """Try to guess x and y limits for picture."""
         xmin, ymin = inf, inf
         xmax, ymax = -inf, -inf
@@ -117,22 +120,27 @@ class Worker:
 
         return xmin, xmax, ymin, ymax
 
-
-    def div_in_rel(self, vertex: Point3, cur: Point3, rel=1, inside=True) -> Point2:
+    def div_in_rel(self,
+                   vertex: Point3,
+                   cur: Point3,
+                   rel=1,
+                   inside=True) -> Point2:
         """Main method that divides «segment» in appropriate relation."""
         from mid_first_type import first_coord, second_coord, third_coord
 
         val = u1(vertex, cur)**2 + u2(vertex, cur)**2 - u3(vertex, cur)**2
         if isclose(abs(val), 0, rel_tol=self.precision):
             # assume frame_type == 1
-            from mid_parab_first_type import first_coord, second_coord, third_coord
+            from mid_parab_first_type import (first_coord, second_coord,
+                                              third_coord)
 
         if self.frame_type == 2:
             from mid_second_type import first_coord, second_coord, third_coord
 
             val = 4 * u1(vertex, cur) * u2(vertex, cur) - u3(vertex, cur)**2
             if isclose(abs(val), 0, rel_tol=self.precision):
-                from mid_parab_second_type import first_coord, second_coord, third_coord
+                from mid_parab_second_type import (first_coord, second_coord,
+                                                   third_coord)
 
         if not isclose(abs(rel), 1, rel_tol=self.precision):
             from mid_first_lambda import first_coord, second_coord, third_coord
@@ -155,7 +163,6 @@ class Worker:
 
         return answer
 
-
     # def profile(func):
     #     """Decorator for run function profile"""
     #     def wrapper(*args, **kwargs):
@@ -166,17 +173,15 @@ class Worker:
     #         return result
     #     return wrapper
 
-
     # @profile
     def work(self, cnt: int, rel=1):
         """Main method that «plays» chaos game."""
-        def bounds(point: Point2) -> bool:
-            return point.isfinite\
-                   and self.xmin <= point.x <= self.xmax\
-                   and self.ymin <= point.y <= self.ymax
-
         def add_point(point, x, y, vert=None, colors=None):
-            if not bounds(point):
+            bounds = point.isfinite\
+                     and self.xmin <= point.x <= self.xmax\
+                     and self.ymin <= point.y <= self.ymax
+
+            if not bounds:
                 return False
 
             x.append(point.x)
@@ -185,9 +190,9 @@ class Worker:
 
             return True
 
-        x_coords = []
-        y_coords = []
-        colors = []
+        x_coords:List[float] = []
+        y_coords:List[float] = []
+        colors:List[str] = []
 
         cur = self.start_point.to_point3(self.projective)
 
@@ -198,13 +203,21 @@ class Worker:
             vertex = choice(self.vertices)
             result = self.div_in_rel(vertex, cur, rel=rel)
 
-            if add_point(result, x_coords, y_coords, vert=vertex, colors=colors):
+            if add_point(result,
+                         x_coords,
+                         y_coords,
+                         vert=vertex,
+                         colors=colors):
                 cur = result.to_point3(self.projective)
 
             if self.double_mid:
                 for val in [rel, -rel]:
                     out = self.div_in_rel(vertex, cur, rel=val, inside=False)
-                    add_point(out, x_coords, y_coords, vert=vertex, colors=colors)
+                    add_point(out,
+                              x_coords,
+                              y_coords,
+                              vert=vertex,
+                              colors=colors)
 
         self._x = np.array(x_coords)
         self._y = np.array(y_coords)

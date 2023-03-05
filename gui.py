@@ -7,6 +7,7 @@ import sys
 import threading
 from math import ceil, inf, pi
 from pathlib import Path
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,44 +25,44 @@ def parse_m(data: str) -> Point2:
         return Point2(inf, inf)
 
     data = data.strip().replace(' ', '')[1:-1]
-    data = list(map(float, data.split(',')))
+    listed = list(map(float, data.split(',')))
 
-    return Point2(data[0], data[1])
+    return Point2(listed[0], listed[1])
 
 
 def parse_vertices(data: str) -> list:
-    """Parse vertices data from text box in format "(x_1:y_1:z_1)\n...\n(x_n:y_n:z_n)"."""
-    data = data.strip().replace(' ', '').replace(',', '.').split('\n')
+    """Parse vertices data from text box in format "(x1:y1:z1)\n..."""
+    improved_data = data.strip().replace(' ', '').replace(',', '.').split('\n')
 
     # remove ( and )
-    data = [i[1:-1] for i in data]
+    listed = [i[1:-1] for i in improved_data]
 
     # make triples (x, y, z)
-    data = [tuple(map(float, i.split(':'))) for i in data]
+    paired = [tuple(map(float, i.split(':'))) for i in listed]
 
-    return [Point3(x, y, z) for (x, y, z) in data]
+    return [Point3(x, y, z) for (x, y, z) in paired]
 
 
 # format: "#HEX1, #HEX2, ..., #HEX3"
 def parse_colors(data: str) -> list:
-    """Parse colors data from text box in format ""#HEX1, #HEX2, ..., #HEXn"."""
+    """Parse colors data from text box in format ""#HEX1, #HEX2, ..."""
     if not data:
         return []
 
     # remove spaces, etc
-    data = data.strip().replace(' ', '').split(',')
+    improved_data = data.strip().replace(' ', '').split(',')
 
-    return [f'{i}' for i in data]
+    return [f'{i}' for i in improved_data]
 
 
-def parse_limits(data: str) -> (float, float, float, float):
+def parse_limits(data: str) -> Tuple[float, float, float, float]:
     """Parse limits data from text box in format "xmin, xmax, ymin, ymax"."""
     if not data:
         return (inf, inf, inf, inf)
 
-    data = data.strip().replace(' ', '').split(',')
+    improved_data = data.strip().replace(' ', '').split(',')
 
-    return tuple(float(i) for i in data)
+    return tuple(float(i) for i in improved_data)
 
 
 class Application:
@@ -75,16 +76,22 @@ class Application:
         self.main_window.setWindowTitle('pyv')
 
         children = [
-            Parameter.create(name='Вершины', type='text', value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
+            Parameter.create(name='Вершины',
+                             type='text',
+                             value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
             dict(name='Стартовая точка', type='str', value=''),
-            dict(name='Цвета точек', type='str', value='#0000ff, #008000, #781f19'),
+            dict(name='Цвета точек',
+                 type='str',
+                 value='#0000ff, #008000, #781f19'),
             dict(name='Случайные цвета', type='bool', value=False),
             dict(name='lambda', type='float', value=1.0),
             dict(name='projective', type='float', value=1.0),
             dict(name='Рисовать вторую середину', type='bool', value=False),
             dict(name='Пределы', type='str', value='-2, 5, -3, 6'),
             dict(name='Угадывать пределы', type='bool', value=False),
-            dict(name='Угадывать пределы (включить абсолют)', type='bool', value=True),
+            dict(name='Угадывать пределы (включить абсолют)',
+                 type='bool',
+                 value=True),
             dict(name='Рисовать границы', type='bool', value=True),
             dict(name='Ширина границ', type='float', value=1.0),
             dict(name='Рисовать абсолют', type='bool', value=True),
@@ -98,7 +105,9 @@ class Application:
         children_exp = [
             dict(name='dpi', type='int', value=600),
             dict(name='Имя файла', type='str', value=''),
-            dict(name='Директория по умолчанию', type='str', value=os.getcwd()),
+            dict(name='Директория по умолчанию',
+                 type='str',
+                 value=os.getcwd()),
             dict(name='Расширение по умолчанию', type='str', value='eps'),
             dict(name='Ширина линий абсолюта', type='float', value=0.25),
             dict(name='Ширина границ', type='float', value=0.25),
@@ -106,14 +115,18 @@ class Application:
             dict(name='Рисовать оси', type='bool', value=False)
         ]
 
-        self.params = Parameter.create(name='Параметры', type='group', children=children)
-        self.params_exp = Parameter.create(name='Экспорт', type='group', children=children_exp)
+        self.params = Parameter.create(name='Параметры',
+                                       type='group',
+                                       children=children)
+        self.params_exp = Parameter.create(name='Экспорт',
+                                           type='group',
+                                           children=children_exp)
         param_tree = ParameterTree(showHeader=False)
         param_tree.addParameters(self.params)
         param_tree.addParameters(self.params_exp)
 
         self.win = pg.GraphicsLayoutWidget(show=False)
-        self.canvas= self.win.addPlot()
+        self.canvas = self.win.addPlot()
         self.canvas.setAspectLocked(True, 1.0)
 
         self.win.setBackground('w')
@@ -128,12 +141,10 @@ class Application:
         action_import.setText('Импортировать')
         action_import.triggered.connect(self.import_conf)
 
-
         menu = self.main_window.menuBar()
         conf = menu.addMenu('Конфигурация')
         conf.addAction(action_export)
         conf.addAction(action_import)
-
 
         btn_plot = QtWidgets.QPushButton("Plot")
         btn_export = QtWidgets.QPushButton("Export")
@@ -145,27 +156,21 @@ class Application:
         button_layout.addWidget(btn_plot)
         button_layout.addWidget(btn_export)
 
-
         main_layout = QtWidgets.QVBoxLayout()
         main_layout.addWidget(param_tree)
         main_layout.addLayout(button_layout)
 
-
         widget = QtWidgets.QWidget()
         widget.setLayout(main_layout)
-
 
         splitter = QtWidgets.QSplitter()
         splitter.addWidget(self.win)
         splitter.addWidget(widget)
 
-
         self.main_window.setCentralWidget(splitter)
         self.main_window.showMaximized()
 
-
         self.worker = Worker()
-
 
     def read_config(self):
         """Read GUI settings and write them to variables."""
@@ -191,7 +196,7 @@ class Application:
         if not self.params.child('Пределы').value():
             xmin, xmax, ymin, ymax = self.worker.guess_limits()
             if self.params.child('Угадывать пределы (включить абсолют)').value():
-                xmin, xmax, ymin, ymax = self.worker.guess_limits(contains_absolute = True)
+                xmin, xmax, ymin, ymax = self.worker.guess_limits(contains_absolute=True)
 
         self.worker.xmin, self.worker.xmax = xmin, xmax
         self.worker.ymin, self.worker.ymax = ymin, ymax
@@ -212,8 +217,10 @@ class Application:
             if val := self.params.child('Ширина границ').value():
                 width = val
 
-            tmp = [i.to_point2() for i in self.worker.vertices + [self.worker.vertices[0]]]
-            for cur, nex in itertools.pairwise(tmp):
+            vertices = self.worker.vertices + [self.worker.vertices[0]]
+            for_pairing = [i.to_point2() for i in vertices]
+
+            for cur, nex in itertools.pairwise(for_pairing):
                 self.canvas.plot([cur.x, nex.x],
                                  [cur.y, nex.y],
                                  pen=pg.mkPen('#000000',
@@ -230,9 +237,9 @@ class Application:
             if self.worker.frame_type == 1:
                 # Абсолют — окружность
                 points = np.linspace(0, 2 * pi, num=100)
-                circle = pg.PlotCurveItem(np.cos(points),\
-                                          np.sin(points),\
-                                          pen = pg.mkPen(color),\
+                circle = pg.PlotCurveItem(np.cos(points),
+                                          np.sin(points),
+                                          pen=pg.mkPen(color),
                                           skipFiniteCheck=True)
                 self.canvas.addItem(circle)
 
@@ -244,18 +251,14 @@ class Application:
                 cnt = ceil(abs(right - left) / 0.01)
 
                 if left * right > 0:
-                    # xs = np.linspace(xmin, xmax, ceil(abs(xmax - xmin) / 0.1))
                     x_coords = np.linspace(left, right, cnt)
                 else:
                     # xmin * xmax < 0, значит, ноль содержится
-                    # xs = np.linspace(xmin, bad_point, ceil(abs(xmin - bad_point) / 0.1))
-                    # np.append(xs, np.linspace(bad_point, xmax, ceil(abs(xmax - bad_point) / 0.1)))
-
                     x_coords = np.linspace(0.1, right, cnt)
                     y_coords = list(map(lambda x: 1 / x, x_coords))
-                    hyperbole = pg.PlotCurveItem(x_coords,\
-                                                 y_coords,\
-                                                 pen=pg.mkPen(color),\
+                    hyperbole = pg.PlotCurveItem(x_coords,
+                                                 y_coords,
+                                                 pen=pg.mkPen(color),
                                                  skipFiniteCheck=True)
                     self.canvas.addItem(hyperbole)
 
@@ -263,12 +266,11 @@ class Application:
 
                 y_coords = list(map(lambda x: 1 / x, x_coords))
 
-                hyperbole = pg.PlotCurveItem(x_coords,\
-                                             y_coords,\
-                                             pen=pg.mkPen(color),\
+                hyperbole = pg.PlotCurveItem(x_coords,
+                                             y_coords,
+                                             pen=pg.mkPen(color),
                                              skipFiniteCheck=True)
                 self.canvas.addItem(hyperbole)
-
 
     def plot(self):
         """Run chaos game and plot with scatterplot."""
@@ -281,7 +283,7 @@ class Application:
         cnt = eval(self.params.child("Количество точек").value())
 
         # run in separate thread
-        plot_thread = threading.Thread(target = self.worker.work,
+        plot_thread = threading.Thread(target=self.worker.work,
                                        args=(cnt,), kwargs={'rel': relation})
         plot_thread.start()
         plot_thread.join()
@@ -298,7 +300,6 @@ class Application:
                                                brush=self.worker.colors))
 
         self.main_window.setWindowTitle('pyv DONE')
-
 
     def export(self):
         """Export image file with matplotlib."""
@@ -325,7 +326,6 @@ class Application:
                 y_coords = np.sin(theta)
                 plt.plot(x_coords, y_coords, **par)
 
-
             if self.worker.frame_type == 2:
                 # Абсолют — гипербола yx - 1 = 0
                 # 0 не содержится
@@ -334,12 +334,9 @@ class Application:
                 cnt = ceil(abs(right - left) / 0.01)
 
                 if left * right > 0:
-                    # xs = np.linspace(xmin, xmax, ceil(abs(xmax - xmin) / 0.1))
                     x_coords = np.linspace(left, right, cnt)
                 else:
                     # xmin * xmax < 0, значит, ноль содержится
-                    # xs = np.linspace(xmin, bad_point, ceil(abs(xmin - bad_point) / 0.1))
-                    # np.append(xs, np.linspace(bad_point, xmax, ceil(abs(xmax - bad_point) / 0.1)))
 
                     x_coords = np.linspace(0.01, right, cnt)
                     y_coords = list(map(lambda x: 1 / x, x_coords))
@@ -358,9 +355,14 @@ class Application:
             if value := self.params_exp.child('Ширина границ').value():
                 width = value
 
-            tmp = [i.to_point2() for i in self.worker.vertices + [self.worker.vertices[0]]]
-            for cur, nex in itertools.pairwise(tmp):
-                plt.plot([cur.x, nex.x], [cur.y, nex.y], c='black', linewidth=width)
+            vertices = self.worker.vertices + [self.worker.vertices[0]]
+            for_pairing = [i.to_point2() for i in vertices]
+
+            for cur, nex in itertools.pairwise(for_pairing):
+                plt.plot([cur.x, nex.x],
+                         [cur.y, nex.y],
+                         c='black',
+                         linewidth=width)
 
         size = 1.0
         if val := self.params_exp.child('Размер точки').value():
@@ -417,7 +419,6 @@ class Application:
                     s=size,
                     edgecolors='none',
                     rasterized=True)
-        # plt.scatter(self.worker.x, self.worker.y, c=self.worker.colors, s=size, edgecolors='none')
         plt.savefig(f'{directory}/{file_name}', dpi=dpi)
 
         plt.close()
@@ -425,7 +426,6 @@ class Application:
         plt.clf()
 
         self.main_window.setWindowTitle('pyv DONE')
-
 
     def export_conf(self):
         """Write current configuration to the JSON file."""
@@ -449,7 +449,6 @@ class Application:
                          'params_exp': self.params_exp.saveState()}
 
             json.dump(json_data, file, indent=4)
-
 
     def import_conf(self):
         """Read parameters trees from the JSON file."""
