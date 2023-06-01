@@ -112,7 +112,10 @@ class Application:
             dict(name='Ширина линий абсолюта', type='float', value=0.25),
             dict(name='Ширина границ', type='float', value=0.25),
             dict(name='Размер точки', type='float', value=0.25),
-            dict(name='Рисовать оси', type='bool', value=False)
+            dict(name='Рисовать оси', type='bool', value=False),
+            dict(name='Параметр \\lambda в имя файла', type='bool', value=False),
+            dict(name='Количество точек в имя файла', type='bool', value=False),
+            dict(name='Растеризовать', type='bool', value=True)
         ]
 
         self.params = Parameter.create(name='Параметры',
@@ -146,8 +149,8 @@ class Application:
         conf.addAction(action_export)
         conf.addAction(action_import)
 
-        btn_plot = QtWidgets.QPushButton("Plot")
-        btn_export = QtWidgets.QPushButton("Export")
+        btn_plot = QtWidgets.QPushButton('Plot')
+        btn_export = QtWidgets.QPushButton('Export')
 
         btn_plot.clicked.connect(self.plot)
         btn_export.clicked.connect(self.export)
@@ -317,9 +320,6 @@ class Application:
                 linewidth = val
 
             if self.worker.frame_type == 1:
-                # Don't work?
-                # par = {'fill': False, 'color': color, 'linewidth': linewidth}
-                # plt.gca().add_patch(plt.Circle((0, 0), 1, **par))
                 par = {'color': color, 'linewidth': linewidth}
                 theta = np.linspace(0, 2 * np.pi, 2**10)
                 x_coords = np.cos(theta)
@@ -372,12 +372,18 @@ class Application:
         if value := self.params_exp.child('Директория по умолчанию').value():
             directory = value
 
-        # TODO: add option for adding number of points to the beginning
-        # TODO: add option for adding lambda to the beginning
-        # file_name = f'{self.params.child("Количество точек").value()}'
-        # for i in self.worker.vertices:
-        #     file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
-        file_name = f'{self.params.child("lambda").value()}'
+        file_name = f''
+
+        if self.params_exp.child('Количество точек в имя файла').value():
+            file_name += f'{self.params.child("Количество точек").value()}'
+
+        if self.params_exp.child('Параметр \\lambda в имя файла').value():
+            file_name += f'_{self.params.child("lambda").value()}'
+
+            # We don't have add count to file name parameter
+            if file_name[0] == '_':
+                file_name = file_name[1:]
+
         for i in self.worker.vertices:
             file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
         # file_name = file_name[1:]
@@ -412,13 +418,14 @@ class Application:
         yes_or_no = {False: 'off', True: 'on'}
         plt.axis(yes_or_no[value])
 
-        # TODO: add rasterization as parameter
+        rasterized = self.params_exp.child('Растеризовать').value()
+
         plt.scatter(self.worker.x,
                     self.worker.y,
                     c=self.worker.colors,
                     s=size,
                     edgecolors='none',
-                    rasterized=True)
+                    rasterized=rasterized)
         plt.savefig(f'{directory}/{file_name}', dpi=dpi)
 
         plt.close()

@@ -26,7 +26,7 @@
                 "syncExpanded": false,
                 "title": null,
                 "name": "\u0412\u0435\u0440\u0448\u0438\u043d\u044b",
-                "value": "(1.41:0:1)\n(4:-2.585:1)\n(4:2.585:1)",
+                "value": "(0.0:0.8:1.0)\n(0.6:-0.5:1.0)\n(-0.6:-0.5:1.0)",
                 "default": "(2:0:1)\n(4:2:1)\n(4:-2:1)"
             },
             "\u0421\u0442\u0430\u0440\u0442\u043e\u0432\u0430\u044f \u0442\u043e\u0447\u043a\u0430": {
@@ -56,7 +56,7 @@
                 "syncExpanded": false,
                 "title": null,
                 "name": "\u0426\u0432\u0435\u0442\u0430 \u0442\u043e\u0447\u0435\u043a",
-                "value": "#0000ff, #008000, #781f19",
+                "value": "#000000, #000000, #000000",
                 "default": "#0000ff, #008000, #781f19"
             },
             "\u0421\u043b\u0443\u0447\u0430\u0439\u043d\u044b\u0435 \u0446\u0432\u0435\u0442\u0430": {
@@ -86,7 +86,7 @@
                 "syncExpanded": false,
                 "title": null,
                 "name": "lambda",
-                "value": 1.0,
+                "value": 0.5,
                 "default": 1.0
             },
             "projective": {
@@ -221,7 +221,7 @@
                 "syncExpanded": false,
                 "title": null,
                 "name": "\u0426\u0432\u0435\u0442 \u0430\u0431\u0441\u043e\u043b\u044e\u0442\u0430",
-                "value": "#ff0000",
+                "value": "#000000",
                 "default": "#ff0000"
             },
             "\u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e \u0442\u043e\u0447\u0435\u043a": {
@@ -313,7 +313,7 @@
                 "syncExpanded": false,
                 "title": null,
                 "name": "dpi",
-                "value": 600,
+                "value": 6000,
                 "default": 600
             },
             "\u0418\u043c\u044f \u0444\u0430\u0439\u043b\u0430": {
