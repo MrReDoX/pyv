@@ -80,3 +80,46 @@ class Point3:
             return Point3(self.x.real, self.y.real, self.z.real)
 
         return Point3(self.x, self.y, self.z)
+
+class nPoint:
+    def __init__(self, *new_coords):
+        self.v = list(new_coords)
+        self.n = len(new_coords)
+
+    def __str__(self) -> str:
+        """Return string of the form (v_1, v_2, \ldots, v_n)."""
+        return '(' + ', '.join(map(str, self.v)) + ')'
+
+    def __getitem__(self, key):
+        """Reload [] operator for convenient use."""
+        return self.v[key]
+
+    def __setitem__(self, key, value):
+        """Reload [] operator for convenient use."""
+        self.v[key] = value
+
+    def to_tuple(self):
+        """Return tuple of the form (v_1, v_2, \ldots, v_n)."""
+        return tuple(i for i in self.v)
+
+    def to_list(self):
+        """Return list of the form [v_1, v_2, \ldots, v_n]."""
+        return self.v
+
+    def isfinite(self) -> bool:
+        """Check that all coordinates are finite."""
+        return all(map(isfinite, self.v))
+
+    def to_lower_dimension(self):
+        """Convert to point with n-1 coordinates."""
+        answer = self.v[:-1]
+        if self.v[-1]:
+            answer = list(map(lambda x: x / self.v[-1], answer))
+
+        return nPoint(*answer)
+
+    def to_bigger_dimension(self, new_coord: float):
+        """Add new coordinate to the end."""
+        l = self.v + [new_coord]
+
+        return nPoint(*l)

@@ -4,7 +4,6 @@ import itertools
 import json
 import os
 import sys
-import threading
 from math import ceil, inf, pi
 from pathlib import Path
 from typing import Tuple
@@ -12,11 +11,13 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
+import pyqtgraph.opengl as gl
 from pyqtgraph.parametertree import Parameter, ParameterTree
 from pyqtgraph.Qt import QtGui, QtWidgets
 
 from iterate import Worker
-from point import Point2, Point3
+from iterate_3d import Worker3D
+from point import Point2, Point3, nPoint
 
 
 def parse_m(data: str) -> Point2:
@@ -40,10 +41,39 @@ def parse_vertices(data: str) -> list:
     # make triples (x, y, z)
     paired = [tuple(map(float, i.split(':'))) for i in listed]
 
-    return [Point3(x, y, z) for (x, y, z) in paired]
+    if len(paired[0]) == 3:
+        return [Point3(x, y, z) for (x, y, z) in paired]
+
+    # for k in [-0.1, -0.2, -0.3, -0.4, -0.5]:
+    #     # t = [nPoint(x + k, y + k, z + k, w) for (x, y, z, w) in paired]
+    #     tp = []
+    #     for x, y, z, w in paired:
+    #         xp = round(x + k, 2)
+    #         yp = round(y + k, 2)
+    #         zp = round(z + k, 2)
+    #         tp.append((xp, yp, zp, 1.0))
+    #     print(*tp, sep='\n')
+    #     print()
 
 
-# format: "#HEX1, #HEX2, ..., #HEX3"
+    return [nPoint(x, y, z, w) for (x, y, z, w) in paired]
+
+
+#def parse_vertices_3d(data: str) -> list:
+#    """Parse vertices data from text box in format "(x1:y1:z1:w1)\n..."""
+#    improved_data = data.strip().replace(' ', '').replace(',', '.').split('\n')
+#
+#    # remove ( and )
+#    listed = [i[1:-1] for i in improved_data]
+#
+#    # make triples (x, y, z)
+#    paired = [tuple(map(float, i.split(':'))) for i in listed]
+#
+#    print(len(paired[0]))
+#
+#    return [nPoint(x, y, z, w) for (x, y, z, w) in paired]
+
+
 def parse_colors(data: str) -> list:
     """Parse colors data from text box in format ""#HEX1, #HEX2, ..."""
     if not data:
@@ -79,43 +109,37 @@ class Application:
             Parameter.create(name='Вершины',
                              type='text',
                              value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
-            dict(name='Стартовая точка', type='str', value=''),
-            dict(name='Цвета точек',
-                 type='str',
-                 value='#0000ff, #008000, #781f19'),
-            dict(name='Случайные цвета', type='bool', value=False),
-            dict(name='lambda', type='float', value=1.0),
-            dict(name='projective', type='float', value=1.0),
-            dict(name='Рисовать вторую середину', type='bool', value=False),
-            dict(name='Пределы', type='str', value='-2, 5, -3, 6'),
-            dict(name='Угадывать пределы', type='bool', value=False),
-            dict(name='Угадывать пределы (включить абсолют)',
-                 type='bool',
-                 value=True),
-            dict(name='Рисовать границы', type='bool', value=True),
-            dict(name='Ширина границ', type='float', value=1.0),
-            dict(name='Рисовать абсолют', type='bool', value=True),
-            dict(name='Цвет абсолюта', type='str', value='#ff0000'),
-            dict(name='Количество точек', type='str', value='2**14'),
-            dict(name='Размер точки', type='float', value=1.0),
-            dict(name='Тип репера', type='int', value=1),
+            {'name': 'Стартовая точка', 'type': 'str', 'value': ''},
+            {'name': 'Цвета точек', 'type': 'str', 'value': '#00406b, #008000, #781f19'},
+            {'name': 'Случайные цвета', 'type': 'bool', 'value': False},
+            {'name': 'lambda', 'type': 'float', 'value': 1.0},
+            {'name': 'projective', 'type': 'float', 'value': 1.0},
+            {'name': 'Рисовать вторую середину', 'type': 'bool', 'value': False},
+            {'name': 'Пределы', 'type': 'str', 'value': ''},
+            {'name': 'Угадывать пределы', 'type': 'bool', 'value': False},
+            {'name': 'Угадывать пределы (включить абсолют)', 'type': 'bool', 'value': True},
+            {'name': 'Рисовать границы', 'type': 'bool', 'value': True},
+            {'name': 'Ширина границ', 'type': 'float', 'value': 1.0},
+            {'name': 'Рисовать абсолют', 'type': 'bool', 'value': True},
+            {'name': 'Цвет абсолюта', 'type': 'str', 'value': '#000000'},
+            {'name': 'Количество точек', 'type': 'str', 'value': '2**14'},
+            {'name': 'Размер точки', 'type': 'float', 'value': 1.0},
+            {'name': 'Тип репера', 'type': 'int', 'value': 1},
             Parameter.create(name='Checker', type='file')
         ]
 
         children_exp = [
-            dict(name='dpi', type='int', value=600),
-            dict(name='Имя файла', type='str', value=''),
-            dict(name='Директория по умолчанию',
-                 type='str',
-                 value=os.getcwd()),
-            dict(name='Расширение по умолчанию', type='str', value='eps'),
-            dict(name='Ширина линий абсолюта', type='float', value=0.25),
-            dict(name='Ширина границ', type='float', value=0.25),
-            dict(name='Размер точки', type='float', value=0.25),
-            dict(name='Рисовать оси', type='bool', value=False),
-            dict(name='Параметр \\lambda в имя файла', type='bool', value=False),
-            dict(name='Количество точек в имя файла', type='bool', value=False),
-            dict(name='Растеризовать', type='bool', value=True)
+            {'name': 'dpi', 'type': 'int', 'value': 600},
+            {'name': 'Имя файла', 'type': 'str', 'value': ''},
+            {'name': 'Директория по умолчанию', 'type': 'str', 'value': os.getcwd()},
+            {'name': 'Расширение по умолчанию', 'type': 'str', 'value': 'eps'},
+            {'name': 'Ширина линий абсолюта', 'type': 'float', 'value': 0.25},
+            {'name': 'Ширина границ', 'type': 'float', 'value': 0.25},
+            {'name': 'Размер точки', 'type': 'float', 'value': 0.25},
+            {'name': 'Рисовать оси', 'type': 'bool', 'value': False},
+            {'name': 'Параметр \\lambda в имя файла', 'type': 'bool', 'value': False},
+            {'name': 'Количество точек в имя файла', 'type': 'bool', 'value': False},
+            {'name': 'Растеризовать', 'type': 'bool', 'value': True}
         ]
 
         self.params = Parameter.create(name='Параметры',
@@ -128,11 +152,20 @@ class Application:
         param_tree.addParameters(self.params)
         param_tree.addParameters(self.params_exp)
 
-        self.win = pg.GraphicsLayoutWidget(show=False)
-        self.canvas = self.win.addPlot()
-        self.canvas.setAspectLocked(True, 1.0)
+        self.graphics_widget_2d = pg.PlotWidget(background='w')
+        self.canvas_2d = self.graphics_widget_2d.getPlotItem()
+        self.canvas_2d.setAspectLocked(True, 1.0)
 
-        self.win.setBackground('w')
+        # self.graphics_widget_3d = gl.GLViewWidget(rotationMethod='quaternion')
+        self.graphics_widget_3d = gl.GLViewWidget()
+        self.graphics_widget_3d.setBackgroundColor('w')
+
+        self.scatter_2d = pg.ScatterPlotItem()
+        self.scatter_3d = gl.GLScatterPlotItem()
+        self.scatter_3d.setGLOptions('translucent')
+
+        self.canvas_2d.addItem(self.scatter_2d)
+        self.graphics_widget_3d.addItem(self.scatter_3d)
 
         action_export = QtGui.QAction(self.main_window)
         action_export.setObjectName('actionExport')
@@ -150,10 +183,12 @@ class Application:
         conf.addAction(action_import)
 
         btn_plot = QtWidgets.QPushButton('Plot')
+        btn_plot.setShortcut('Ctrl+Return')
+
         btn_export = QtWidgets.QPushButton('Export')
 
-        btn_plot.clicked.connect(self.plot)
-        btn_export.clicked.connect(self.export)
+        btn_plot.clicked.connect(self.plot_2d)
+        btn_export.clicked.connect(self.export_2d)
 
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.addWidget(btn_plot)
@@ -163,17 +198,29 @@ class Application:
         main_layout.addWidget(param_tree)
         main_layout.addLayout(button_layout)
 
-        widget = QtWidgets.QWidget()
-        widget.setLayout(main_layout)
+        params_and_buttons_widget = QtWidgets.QWidget()
+        params_and_buttons_widget.setLayout(main_layout)
+
+        # 2d, 3d tab on the bottom
+        tab_widget = QtWidgets.QTabWidget()
+        # tab_widget.addTab(self.graphics_widget_2d, '2d')
+        tab_widget.addTab(self.graphics_widget_2d, '2d')
+        tab_widget.addTab(self.graphics_widget_3d, '3d')
+        # tab_widget.setTabPosition(QtWidgets.QTabWidget.TabPosition.South)
+        tab_widget.setTabPosition(QtWidgets.QTabWidget.TabPosition.South)
+        tab_widget.currentChanged.connect(lambda: self.tab_changed(tab_widget,
+                                                                   btn_plot,
+                                                                   btn_export))
 
         splitter = QtWidgets.QSplitter()
-        splitter.addWidget(self.win)
-        splitter.addWidget(widget)
+        splitter.addWidget(tab_widget)
+        splitter.addWidget(params_and_buttons_widget)
 
         self.main_window.setCentralWidget(splitter)
         self.main_window.showMaximized()
 
         self.worker = Worker()
+        self.worker_3d = Worker3D()
 
     def read_config(self):
         """Read GUI settings and write them to variables."""
@@ -204,10 +251,8 @@ class Application:
         self.worker.xmin, self.worker.xmax = xmin, xmax
         self.worker.ymin, self.worker.ymax = ymin, ymax
 
-        self.canvas = self.win.addPlot()
-        self.canvas.setAspectLocked(True, 1.0)
-        self.canvas.setXRange(xmin, xmax)
-        self.canvas.setYRange(ymin, ymax)
+        self.canvas_2d.setXRange(xmin, xmax)
+        self.canvas_2d.setYRange(ymin, ymax)
 
         if val := self.params.child('Checker').value():
             sys.path.append(os.path.dirname(val))
@@ -224,10 +269,10 @@ class Application:
             for_pairing = [i.to_point2() for i in vertices]
 
             for cur, nex in itertools.pairwise(for_pairing):
-                self.canvas.plot([cur.x, nex.x],
-                                 [cur.y, nex.y],
-                                 pen=pg.mkPen('#000000',
-                                 width=width))
+                self.canvas_2d.plot([cur.x, nex.x],
+                                    [cur.y, nex.y],
+                                    pen=pg.mkPen('#000000',
+                                    width=width))
 
         if val := self.params.child('Тип репера').value():
             self.worker.frame_type = val
@@ -240,11 +285,18 @@ class Application:
             if self.worker.frame_type == 1:
                 # Абсолют — окружность
                 points = np.linspace(0, 2 * pi, num=100)
-                circle = pg.PlotCurveItem(np.cos(points),
-                                          np.sin(points),
-                                          pen=pg.mkPen(color),
-                                          skipFiniteCheck=True)
-                self.canvas.addItem(circle)
+                # circle = pg.PlotCurveItem(np.cos(points),
+                #                           np.sin(points),
+                #                           pen=pg.mkPen(color),
+                #                           skipFiniteCheck=True)
+
+                circle = self.canvas_2d.plot()
+                circle.setData(np.cos(points),
+                               np.sin(points),
+                               pen=pg.mkPen(color),
+                               skipFiniteCheck=True)
+
+                # self.canvas_2d.addItem(circle, row=0, col=0)
 
             if self.worker.frame_type == 2:
                 # Абсолют — гипербола yx - 1 = 0
@@ -263,7 +315,7 @@ class Application:
                                                  y_coords,
                                                  pen=pg.mkPen(color),
                                                  skipFiniteCheck=True)
-                    self.canvas.addItem(hyperbole)
+                    self.canvas_2d.addItem(hyperbole)
 
                     x_coords = np.linspace(left, -0.1, cnt)
 
@@ -273,38 +325,153 @@ class Application:
                                              y_coords,
                                              pen=pg.mkPen(color),
                                              skipFiniteCheck=True)
-                self.canvas.addItem(hyperbole)
+                self.canvas_2d.addItem(hyperbole)
 
-    def plot(self):
-        """Run chaos game and plot with scatterplot."""
+    def plot_2d(self):
+        """Run chaos game and plot with ScatterPlot."""
         self.main_window.setWindowTitle('pyv BUSY')
-        self.win.clear()
+        # self.canvas_2d.clear()
 
+        # To avoid
+        # RuntimeError: wrapped C/C++ object of type Worker has been deleted
+        self.worker = Worker()
         self.read_config()
 
         relation = self.params.child('lambda').value()
         cnt = eval(self.params.child("Количество точек").value())
 
-        # run in separate thread
-        plot_thread = threading.Thread(target=self.worker.work,
-                                       args=(cnt,), kwargs={'rel': relation})
-        plot_thread.start()
-        plot_thread.join()
+        size = 1.0
+        if val := self.params.child('Размер точки').value():
+            size = val
 
-        self.worker.clean()
+        def work_finished(x, y, colors):
+            x, y, colors = self.worker.clean(x, y, colors)
+
+            self.scatter_2d.setData(x=x,
+                                    y=y,
+                                    size=size,
+                                    brush=colors)
+
+            self.main_window.setWindowTitle('pyv DONE')
+
+        # run in separate thread
+        self.worker.args=(cnt,)
+        self.worker.kwargs={'rel': relation}
+        self.worker.signals.result.connect(work_finished)
+        self.worker.threadpool.start(self.worker)
+
+    # TODO:
+    # 1. draw parallelepiped
+    # 2. parse_vertices round
+    def plot_3d(self):
+        """Run chaos game and plot with GLScatterPlot."""
+        self.main_window.setWindowTitle('pyv BUSY')
+
+        self.graphics_widget_3d.clear()
+        self.graphics_widget_3d.addItem(self.scatter_3d)
+
+        self.worker_3d = Worker3D()
+        self.worker_3d.vertices = parse_vertices(self.params.child('Вершины').value())
+        self.worker_3d.start_point = nPoint(1, 1, 1)
+        self.worker_3d.start_point = self.worker_3d.gen_start_point()
+        self.worker_3d.vertices_colors = self.worker_3d.gen_random_colors()
+
+        # draw boundary
+        lower = [i.to_lower_dimension().to_tuple() for i in self.worker_3d.vertices]
+        # lower += [lower[-1]]
+        # for cur, nex in zip(lower, lower[1:]):
+        #     # print(np.shape(np.array([cur, nex])))
+
+        #     line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
+        #                              color=pg.glColor('k'),
+        #                              width=5,
+        #                              antialias=True)
+
+        #     self.graphics_widget_3d.addItem(line)
+        lower_first = lower[:4]
+        lower_first += [lower_first[0]]
+        for cur, nex in zip(lower_first, lower_first[1:]):
+             line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
+                                      color=pg.glColor('k'),
+                                      width=5,
+                                      antialias=True)
+
+             self.graphics_widget_3d.addItem(line)
+
+        lower_second = lower[4:]
+        lower_second += [lower_second[0]]
+        for cur, nex in zip(lower_second, lower_second[1:]):
+             line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
+                                      color=pg.glColor('k'),
+                                      width=5,
+                                      antialias=True)
+
+             self.graphics_widget_3d.addItem(line)
+
+        for cur, nex in zip(lower[:4], lower[4:]):
+             line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
+                                      color=pg.glColor('k'),
+                                      width=5,
+                                      antialias=True)
+
+             self.graphics_widget_3d.addItem(line)
+
+        # draw absolute
+        mesh_data = gl.MeshData.sphere(rows=128, cols=128)
+        sphere = gl.GLMeshItem(meshdata=mesh_data, smooth=True, color=pg.glColor('r'))
+        self.graphics_widget_3d.addItem(sphere)
+
+        # create three grids, add each to the view
+        xgrid = gl.GLGridItem(color=(0, 0, 0, 255))
+        ygrid = gl.GLGridItem(color=(0, 0, 0, 255))
+        zgrid = gl.GLGridItem(color=(0, 0, 0, 255))
+        self.graphics_widget_3d.addItem(xgrid)
+        self.graphics_widget_3d.addItem(ygrid)
+        self.graphics_widget_3d.addItem(zgrid)
+        # rotate x and y grids to face the correct direction
+        xgrid.rotate(90, 0, 1, 0)
+        ygrid.rotate(90, 1, 0, 0)
+
+        relation = self.params.child('lambda').value()
+        cnt = eval(self.params.child("Количество точек").value())
 
         size = 1.0
         if val := self.params.child('Размер точки').value():
             size = val
 
-        self.canvas.addItem(pg.ScatterPlotItem(x=self.worker.x,
-                                               y=self.worker.y,
-                                               size=size,
-                                               brush=self.worker.colors))
+        def work_finished(x, y, z, colors):
+            if len(x) < 1000:
+                self.plot_3d()
 
-        self.main_window.setWindowTitle('pyv DONE')
+                return
 
-    def export(self):
+            colors = np.array(list(map(pg.glColor, colors)))
+            # colors = np.array([pg.glColor(i) for i in colors])
+
+            x = x[:, np.newaxis]
+            y = y[:, np.newaxis]
+            z = z[:, np.newaxis]
+
+            data = np.hstack((x, y, z))
+
+            print(np.shape(data))
+            print(np.shape(colors))
+            print('\n')
+
+            self.scatter_3d.setData(pos=data,
+                                    color=colors,
+                                    size=5 * size,
+                                    pxMode=True)
+
+            self.main_window.setWindowTitle('pyv DONE')
+
+        # run in separate thread
+        self.worker_3d.args=(cnt,)
+        self.worker_3d.kwargs={'rel': relation}
+        self.worker_3d.signals.result.connect(work_finished)
+        self.worker_3d.threadpool.start(self.worker_3d)
+
+    def export_2d(self):
         """Export image file with matplotlib."""
         self.main_window.setWindowTitle('pyv EXPORTING')
 
@@ -372,7 +539,7 @@ class Application:
         if value := self.params_exp.child('Директория по умолчанию').value():
             directory = value
 
-        file_name = f''
+        file_name = ''
 
         if self.params_exp.child('Количество точек в имя файла').value():
             file_name += f'{self.params.child("Количество точек").value()}'
@@ -380,13 +547,12 @@ class Application:
         if self.params_exp.child('Параметр \\lambda в имя файла').value():
             file_name += f'_{self.params.child("lambda").value()}'
 
-            # We don't have add count to file name parameter
-            if file_name[0] == '_':
-                file_name = file_name[1:]
-
         for i in self.worker.vertices:
             file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
         # file_name = file_name[1:]
+
+        if file_name[0] == '_':
+            file_name = file_name[1:]
 
         if val := self.params_exp.child('Имя файла').value():
             file_name = val
@@ -434,6 +600,22 @@ class Application:
 
         self.main_window.setWindowTitle('pyv DONE')
 
+    def export_3d(self):
+        """TODO."""
+        filename = 'test.png'
+
+        # №1
+        # d = self.graphics_widget_3d.renderToArray((1000, 1000))
+        # pg.makeQImage(d).save(filename, quality=100)
+
+        # № 2
+        # grabs current
+        self.graphics_widget_3d.grabFramebuffer().save(filename)
+
+        # № 3
+        # matplotlib?
+
+
     def export_conf(self):
         """Write current configuration to the JSON file."""
         filt = 'Json File (*.json)'
@@ -477,7 +659,25 @@ class Application:
             self.params.restoreState(json_data['params'])
             self.params_exp.restoreState(json_data['params_exp'])
 
+    def tab_changed(self, tab_widget, button_plot, button_export):
+        """Switch plot and export signals, when switch between tabs."""
+        button_plot.disconnect()
+        button_export.disconnect()
+
+        # idx == 0 — 2d
+        # idx == 1 — 3d
+        choice = [{'plot': self.plot_2d, 'export': self.export_2d},
+                  {'plot': self.plot_3d, 'export': self.export_3d}]
+
+        idx = tab_widget.currentIndex()
+
+        button_plot.clicked.connect(choice[idx]['plot'])
+        button_export.clicked.connect(choice[idx]['export'])
+
 
 if __name__ == '__main__':
+    # p4 = nPoint(1, 2, 3, 4)
+    # print(p4)
+
     app = Application()
     pg.exec()

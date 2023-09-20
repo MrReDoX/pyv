@@ -1,20 +1,53 @@
-"""Module that perfoms chaos game."""
+"""Module that perfoms chaos game on plane."""
 
 # import cProfile
+import sys
+import traceback
 from math import inf, isclose
 from random import choice, uniform
 from typing import List, Tuple
 
 import numpy as np
+from pyqtgraph.Qt.QtCore import *
+from pyqtgraph.Qt.QtGui import *
+from pyqtgraph.Qt.QtWidgets import *
 from shapely.geometry import Point, Polygon
 
 from point import Point2, Point3
 from utility import PRECISION, u1, u2, u3
 
 
-class Worker:
+class WorkerSignals(QObject):
+    '''
+    Defines the signals available from a running worker thread.
+
+    Supported signals are:
+
+    finished
+        No data
+
+    error
+        tuple (exctype, value, traceback.format_exc() )
+
+    result
+        object data returned from processing, anything
+
+    '''
+    finished = pyqtSignal()
+    error = pyqtSignal(tuple)
+    result = pyqtSignal(object, object, object)
+
+
+class Worker(QRunnable):
     """Main class that «plays» chaos game with settings."""
     def __init__(self):
+        # For threading
+        super(Worker, self).__init__()
+        self.threadpool = QThreadPool()
+        self.args = None
+        self.kwargs = None
+        self.signals = WorkerSignals()
+
         self.start_point = Point2(0.0, 0.0)
         self._vertices = []
         self.checker = self.convex_trick
@@ -24,8 +57,8 @@ class Worker:
         self.projective = 1
         self.frame_type = 2
 
-        self.precision = PRECISION * 10
-        self.decimals = 5
+        self.precision = PRECISION
+        self.decimals = 3
 
         self.xmin = -inf
         self.xmax = inf
@@ -38,15 +71,15 @@ class Worker:
         """Getter for vertices of triangle, rectangle etc."""
         return self._vertices
 
-    @property
-    def x(self) -> list:
-        """Getter for x coordinates of chaos game points."""
-        return list(self._x)
+    # @property
+    # def x(self) -> list:
+    #     """Getter for x coordinates of chaos game points."""
+    #     return list(self._x)
 
-    @property
-    def y(self) -> list:
-        """Getter for y coordinates of chaos game points."""
-        return list(self._y)
+    # @property
+    # def y(self) -> list:
+    #     """Getter for y coordinates of chaos game points."""
+    #     return list(self._y)
 
     @property
     def colors(self) -> list:
@@ -173,11 +206,16 @@ class Worker:
     #         return result
     #     return wrapper
 
-    # @profile
+    @pyqtSlot()
+    def run(self):
+        x, y, colors = self.work(*self.args, **self.kwargs)
+
+        self.signals.result.emit(x, y, colors)
+
     def work(self, cnt: int, rel=1):
         """Main method that «plays» chaos game."""
         def add_point(point, x, y, vert=None, colors=None):
-            bounds = point.isfinite\
+            bounds = point.isfinite()\
                      and self.xmin <= point.x <= self.xmax\
                      and self.ymin <= point.y <= self.ymax
 
@@ -219,17 +257,17 @@ class Worker:
                               vert=vertex,
                               colors=colors)
 
-        self._x = np.array(x_coords)
-        self._y = np.array(y_coords)
-        self._colors = np.array(colors)
+        return np.array(x_coords), np.array(y_coords), np.array(colors)
 
-    def clean(self):
+    def clean(self, x, y, colors):
         """Take quotient of points by current precision."""
-        self._x = np.round(self._x, decimals=self.decimals)
-        self._y = np.round(self._y, decimals=self.decimals)
+        x = np.round(x, decimals=self.decimals)
+        y = np.round(y, decimals=self.decimals)
 
-        _, idx = np.unique(self._x + 1j * self._y, return_index=True)
+        _, idx = np.unique(x + 1j * y, return_index=True)
 
-        self._x = np.take(self._x, idx)
-        self._y = np.take(self._y, idx)
-        self._colors = np.take(self._colors, idx, mode='clip')
+        x = np.take(x, idx)
+        y = np.take(y, idx)
+        colors = np.take(colors, idx, mode='clip')
+
+        return x, y, colors
