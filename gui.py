@@ -1,5 +1,10 @@
 """Main program module. Builds GUI and run program."""
 
+# TODO:
+# 1. If lambda is a list (e.g. 0.1, 0.3, 0.5, 0.7, 0.9) then plot and export for all such lambda automaticly
+# 2. Fix checkers messages
+# 3. Strategies
+
 import itertools
 import json
 import os
@@ -8,13 +13,13 @@ from math import ceil, inf, pi
 from pathlib import Path
 from typing import Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.parametertree import Parameter, ParameterTree
 from pyqtgraph.Qt import QtGui, QtWidgets
 
+from exporter import Exporter2D
 from iterate import Worker
 from iterate_3d import Worker3D
 from point import Point2, Point3, nPoint
@@ -54,7 +59,6 @@ def parse_vertices(data: str) -> list:
     #         tp.append((xp, yp, zp, 1.0))
     #     print(*tp, sep='\n')
     #     print()
-
 
     return [nPoint(x, y, z, w) for (x, y, z, w) in paired]
 
@@ -129,7 +133,7 @@ class Application:
         ]
 
         children_exp = [
-            {'name': 'dpi', 'type': 'int', 'value': 600},
+            {'name': 'dpi', 'type': 'int', 'value': 5000},
             {'name': 'Имя файла', 'type': 'str', 'value': ''},
             {'name': 'Директория по умолчанию', 'type': 'str', 'value': os.getcwd()},
             {'name': 'Расширение по умолчанию', 'type': 'str', 'value': 'eps'},
@@ -137,7 +141,7 @@ class Application:
             {'name': 'Ширина границ', 'type': 'float', 'value': 0.25},
             {'name': 'Размер точки', 'type': 'float', 'value': 0.25},
             {'name': 'Рисовать оси', 'type': 'bool', 'value': False},
-            {'name': 'Параметр \\lambda в имя файла', 'type': 'bool', 'value': False},
+            {'name': 'Параметр \\lambda в имя файла', 'type': 'bool', 'value': True},
             {'name': 'Количество точек в имя файла', 'type': 'bool', 'value': False},
             {'name': 'Растеризовать', 'type': 'bool', 'value': True}
         ]
@@ -232,11 +236,12 @@ class Application:
 
         self.worker.coloring = False
         if val := self.params.child('Цвета точек').value():
-            self.worker.coloring = True
             self.worker.vertices_colors = parse_colors(val)
 
+        if not self.params.child('Цвета точек').value():
+            self.worker.vertices_colors = ['#000000'] * len(self.worker.vertices)
+
         if self.params.child('Случайные цвета').value():
-            self.worker.coloring = True
             self.worker.vertices_colors = self.worker.gen_random_colors()
 
         self.worker.projective = self.params.child('projective').value()
@@ -330,7 +335,8 @@ class Application:
     def plot_2d(self):
         """Run chaos game and plot with ScatterPlot."""
         self.main_window.setWindowTitle('pyv BUSY')
-        # self.canvas_2d.clear()
+        self.canvas_2d.clear()
+        self.canvas_2d.addItem(self.scatter_2d)
 
         # To avoid
         # RuntimeError: wrapped C/C++ object of type Worker has been deleted
@@ -346,6 +352,10 @@ class Application:
 
         def work_finished(x, y, colors):
             x, y, colors = self.worker.clean(x, y, colors)
+
+            self.x = x
+            self.y = y
+            self.colors = colors
 
             self.scatter_2d.setData(x=x,
                                     y=y,
@@ -471,134 +481,25 @@ class Application:
         self.worker_3d.signals.result.connect(work_finished)
         self.worker_3d.threadpool.start(self.worker_3d)
 
+    # TODO:
+    # Multithreading on export:
+    # 1. Separate class
+    # 2. Compress params to dict
+    # 3. Pass params as argument
     def export_2d(self):
         """Export image file with matplotlib."""
         self.main_window.setWindowTitle('pyv EXPORTING')
 
-        plt.gca().set_aspect('equal', adjustable='box')
-
-        if self.params.child('Рисовать абсолют').value():
-            color = 'red'
-            if val := self.params.child('Цвет абсолюта').value():
-                color = val
-
-            linewidth = 0.25
-            if val := self.params_exp.child('Ширина линий абсолюта').value():
-                linewidth = val
-
-            if self.worker.frame_type == 1:
-                par = {'color': color, 'linewidth': linewidth}
-                theta = np.linspace(0, 2 * np.pi, 2**10)
-                x_coords = np.cos(theta)
-                y_coords = np.sin(theta)
-                plt.plot(x_coords, y_coords, **par)
-
-            if self.worker.frame_type == 2:
-                # Абсолют — гипербола yx - 1 = 0
-                # 0 не содержится
-                left = self.worker.xmin - 2
-                right = self.worker.xmax + 2
-                cnt = ceil(abs(right - left) / 0.01)
-
-                if left * right > 0:
-                    x_coords = np.linspace(left, right, cnt)
-                else:
-                    # xmin * xmax < 0, значит, ноль содержится
-
-                    x_coords = np.linspace(0.01, right, cnt)
-                    y_coords = list(map(lambda x: 1 / x, x_coords))
-                    plt.plot(x_coords, y_coords, c=color, linewidth=linewidth)
-
-                    x_coords = np.linspace(left, -0.01, cnt)
-
-                y_coords = list(map(lambda x: 1 / x, x_coords))
-                plt.plot(x_coords, y_coords, c=color, linewidth=linewidth)
-
-        plt.xlim(self.worker.xmin - 2, self.worker.xmax + 2)
-        plt.ylim(self.worker.ymin - 2, self.worker.ymax + 2)
-
-        if self.params.child('Рисовать границы').value():
-            width = 0.25
-            if value := self.params_exp.child('Ширина границ').value():
-                width = value
-
-            vertices = self.worker.vertices + [self.worker.vertices[0]]
-            for_pairing = [i.to_point2() for i in vertices]
-
-            for cur, nex in itertools.pairwise(for_pairing):
-                plt.plot([cur.x, nex.x],
-                         [cur.y, nex.y],
-                         c='black',
-                         linewidth=width)
-
-        size = 1.0
-        if val := self.params_exp.child('Размер точки').value():
-            size = val
-
-        directory = os.getcwd()
-        if value := self.params_exp.child('Директория по умолчанию').value():
-            directory = value
-
-        file_name = ''
-
-        if self.params_exp.child('Количество точек в имя файла').value():
-            file_name += f'{self.params.child("Количество точек").value()}'
-
-        if self.params_exp.child('Параметр \\lambda в имя файла').value():
-            file_name += f'_{self.params.child("lambda").value()}'
-
-        for i in self.worker.vertices:
-            file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
-        # file_name = file_name[1:]
-
-        if file_name[0] == '_':
-            file_name = file_name[1:]
-
-        if val := self.params_exp.child('Имя файла').value():
-            file_name = val
-
-        extension = 'eps'
-        if value := self.params_exp.child('Расширение по умолчанию').value():
-            extension = value
-
-        directory += f'/{file_name}.{extension}'
-
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            parent=self.main_window,
-            caption='Выберите файл',
-            directory=directory
-        )
-
-        directory, file_name = os.path.split(path)
-
-        if not file_name:
+        def work_finished():
             self.main_window.setWindowTitle('pyv DONE')
 
-            return
+        exporter = Exporter2D()
+        exporter.args=(self.worker, self.params, self.params_exp,
+                       self.x, self.y, self.colors)
+        exporter.kwargs={}
+        exporter.signals.finished.connect(work_finished)
+        exporter.threadpool.start(exporter)
 
-        dpi = 600
-        if val := self.params_exp.child('dpi').value():
-            dpi = val
-
-        value = self.params_exp.child('Рисовать оси').value()
-        yes_or_no = {False: 'off', True: 'on'}
-        plt.axis(yes_or_no[value])
-
-        rasterized = self.params_exp.child('Растеризовать').value()
-
-        plt.scatter(self.worker.x,
-                    self.worker.y,
-                    c=self.worker.colors,
-                    s=size,
-                    edgecolors='none',
-                    rasterized=rasterized)
-        plt.savefig(f'{directory}/{file_name}', dpi=dpi)
-
-        plt.close()
-        plt.cla()
-        plt.clf()
-
-        self.main_window.setWindowTitle('pyv DONE')
 
     def export_3d(self):
         """TODO."""
@@ -618,11 +519,21 @@ class Application:
 
     def export_conf(self):
         """Write current configuration to the JSON file."""
+        default_name = ''
+
+        for i in self.worker.vertices:
+            default_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
+
+        if default_name[0] == '_':
+            default_name = default_name[1:]
+
+        default_name += '.json'
+
         filt = 'Json File (*.json)'
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             parent=self.main_window,
             caption='Выберите файл',
-            directory=os.getcwd(),
+            directory=os.getcwd() + f'/{default_name}',
             filter=filt,
             initialFilter=filt
         )
@@ -676,8 +587,5 @@ class Application:
 
 
 if __name__ == '__main__':
-    # p4 = nPoint(1, 2, 3, 4)
-    # print(p4)
-
     app = Application()
     pg.exec()

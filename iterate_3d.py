@@ -1,7 +1,7 @@
-"""Module that perfoms chaos game on plane."""
+"""Module that perfoms chaos game in space."""
 
 # import cProfile
-from math import inf, isclose
+from math import inf
 from random import choice, uniform
 from typing import List, Tuple
 
@@ -11,8 +11,9 @@ from pyqtgraph.Qt.QtGui import *
 from pyqtgraph.Qt.QtWidgets import *
 from shapely.geometry import Point, Polygon
 
-from point import Point2, Point3
-from utility import PRECISION, u1, u2, u3
+from mid_3d import get_coords
+from point import Point2, Point3, nPoint
+from utility import PRECISION
 
 
 class WorkerSignals(QObject):
@@ -33,23 +34,24 @@ class WorkerSignals(QObject):
     '''
     finished = pyqtSignal()
     error = pyqtSignal(tuple)
-    result = pyqtSignal(object, object, object)
+    result = pyqtSignal(object, object, object, object)
 
 
-class Worker(QRunnable):
+class Worker3D(QRunnable):
     """Main class that «plays» chaos game with settings."""
     def __init__(self):
         # For threading
-        super(Worker, self).__init__()
+        super(Worker3D, self).__init__()
         self.threadpool = QThreadPool()
         self.args = None
         self.kwargs = None
         self.signals = WorkerSignals()
 
-        self.start_point = Point2(0.0, 0.0)
+        self.start_point = nPoint(0.0, 0.0, 0.0)
         self._vertices = []
         self.checker = self.convex_trick
         self.vertices_colors = []
+        self.coloring = True
         self.double_mid = False
         self.projective = 1
         self.frame_type = 2
@@ -88,7 +90,9 @@ class Worker(QRunnable):
         """Setter for vertices. Builds shapely polygon when points are set."""
         self._vertices = value
 
-        pairs = [(i.to_point2().x, i.to_point2().y) for i in self.vertices]
+        # pairs = [(i.to_point2().x, i.to_point2().y) for i in self.vertices]
+        # pairs = [(i.to_lower_dimension().x, i.to_point2().y) for i in self.vertices]
+        pairs = [i.to_lower_dimension().to_tuple() for i in self.vertices]
 
         self.poly = Polygon(pairs)
 
@@ -105,23 +109,69 @@ class Worker(QRunnable):
 
     # TODO: rewrite using cp algorithm
     # https://cp-algorithms.com/geometry/point-in-convex-polygon.html
-    def convex_trick(self, point: Point2) -> bool:
+    def convex_trick(self, point: nPoint) -> bool:
         """Use built-in shapely method to check that points fit."""
-        return Point(point.x, point.y).within(self.poly)
+        # Check 3 projections. (WHY???)
+        # https://stackoverflow.com/questions/56793060/how-to-determine-if-a-point-lies-inside-a-polygon-in-3d-space
 
-    def gen_start_point(self) -> Point2:
+        lower = [i.to_lower_dimension().to_tuple() for i in self.vertices]
+
+        # debug
+        # pairs1 = [i[1:] for i in lower]
+        # pairs2 =[i[:1] + i[2:] for i in lower]
+        # pairs3 = [i[:-1] for i in lower]
+        # print(point)
+        # print(lower)
+        # print(pairs1)
+        # print(pairs2)
+        # print(pairs3, '\n')
+
+        # Ignore X
+        pairs = {i[1:] for i in lower}
+
+        if not Point(point[1], point[2]).within(Polygon(pairs)):
+            return False
+
+        # Ignore Y
+        pairs = {i[:1] + i[2:] for i in lower}
+
+        if not Point(point[0], point[2]).within(Polygon(pairs)):
+            return False
+
+        # Ignore Z
+        pairs = {i[:-1] for i in lower}
+        if not Point(point[0], point[1]).within(Polygon(pairs)):
+            return False
+
+        return True
+
+    def gen_start_point(self) -> nPoint:
         """Randomly choose starting point."""
-        minx, miny, maxx, maxy = self.poly.bounds
+        # minx, miny, maxx, maxy = self.poly.bounds
+        # x = uniform(minx, maxx)
+        # y = uniform(miny, maxy)
+        # # Point is from shapely.geometry
+        # while not self.poly.contains(Point(x, y)):
+        #     x = uniform(minx, maxx)
+        #     y = uniform(miny, maxy)
+        # return Point2(x, y)
+
+        xs, ys, zs = zip(*map(lambda p: p.to_lower_dimension(), self.vertices))
+
+        minx, miny, minz = min(xs), min(ys), min(zs)
+        maxx, maxy, maxz = max(xs), max(ys), max(zs)
 
         x = uniform(minx, maxx)
         y = uniform(miny, maxy)
+        z = uniform(minz, maxz)
 
-        # Point is from shapely.geometry
-        while not self.poly.contains(Point(x, y)):
+        while not self.convex_trick(nPoint(x, y, z)):
             x = uniform(minx, maxx)
             y = uniform(miny, maxy)
+            z = uniform(minz, maxz)
 
-        return Point2(x, y)
+        return nPoint(x, y, z)
+
 
     def guess_limits(self, contains_absolute=False) -> Tuple[float, float, float, float]:
         """Try to guess x and y limits for picture."""
@@ -151,45 +201,30 @@ class Worker(QRunnable):
         return xmin, xmax, ymin, ymax
 
     def div_in_rel(self,
-                   vertex: Point3,
-                   cur: Point3,
+                   vertex: nPoint,
+                   cur: nPoint,
                    rel=1,
                    inside=True) -> Point2:
         """Main method that divides «segment» in appropriate relation."""
-        from mid_first_type import first_coord, second_coord, third_coord
 
-        val = u1(vertex, cur)**2 + u2(vertex, cur)**2 - u3(vertex, cur)**2
-        if isclose(abs(val), 0, rel_tol=self.precision):
-            # assume frame_type == 1
-            from mid_parab_first_type import (first_coord, second_coord,
-                                              third_coord)
+        answer = get_coords(vertex, cur, rel).to_lower_dimension()
 
-        if self.frame_type == 2:
-            from mid_second_type import first_coord, second_coord, third_coord
+        # x = first_coord(vertex, cur, rel)
+        # y = second_coord(vertex, cur, rel)
+        # z = third_coord(vertex, cur, rel)
 
-            val = 4 * u1(vertex, cur) * u2(vertex, cur) - u3(vertex, cur)**2
-            if isclose(abs(val), 0, rel_tol=self.precision):
-                from mid_parab_second_type import (first_coord, second_coord,
-                                                   third_coord)
-
-        if not isclose(abs(rel), 1, rel_tol=self.precision):
-            from mid_first_lambda import first_coord, second_coord, third_coord
-
-        x = first_coord(vertex, cur, rel)
-        y = second_coord(vertex, cur, rel)
-        z = third_coord(vertex, cur, rel)
-
-        answer = Point3(x, y, z).to_point2().to_float()
+        # answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
-            x = first_coord(vertex, cur, -rel)
-            y = second_coord(vertex, cur, -rel)
-            z = third_coord(vertex, cur, -rel)
+            answer = get_coords(vertex, cur, -rel).to_lower_dimension()
+            #x = first_coord(vertex, cur, -rel)
+            #y = second_coord(vertex, cur, -rel)
+            #z = third_coord(vertex, cur, -rel)
 
-            answer = Point3(x, y, z).to_point2().to_float()
+            #answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
-            return Point2(inf, inf)
+            return Point3(inf, inf, inf)
 
         return answer
 
@@ -205,45 +240,55 @@ class Worker(QRunnable):
 
     @pyqtSlot()
     def run(self):
-        x, y, colors = self.work(*self.args, **self.kwargs)
+        x, y, z, colors = self.work(*self.args, **self.kwargs)
 
-        self.signals.result.emit(x, y, colors)
+        self.signals.result.emit(x, y, z, colors)
 
     def work(self, cnt: int, rel=1):
         """Main method that «plays» chaos game."""
-        def add_point(point, x, y, vert=None, colors=None):
-            bounds = point.isfinite()\
-                     and self.xmin <= point.x <= self.xmax\
-                     and self.ymin <= point.y <= self.ymax
+        def add_point(point, x, y, z, vert=None, colors=None):
+            bounds = point.isfinite()
+                     # and self.xmin <= point.x <= self.xmax\
+                     # and self.ymin <= point.y <= self.ymax
 
             if not bounds:
                 return False
 
-            x.append(point.x)
-            y.append(point.y)
+            x.append(point[0])
+            y.append(point[1])
+            z.append(point[2])
             colors.append(self.vertices_colors[self.vertices.index(vert)])
 
             return True
 
         x_coords:List[float] = []
         y_coords:List[float] = []
+        z_coords:List[float] = []
         colors:List[str] = []
 
-        cur = self.start_point.to_point3(self.projective)
+        cur = self.start_point.to_bigger_dimension(self.projective)
+        # cur = self.start_point.to_point3(self.projective)
 
-        print(cur)
+        # print(cur)
 
         # while len(x_coords) < cnt:
         for _ in range(cnt):
             vertex = choice(self.vertices)
             result = self.div_in_rel(vertex, cur, rel=rel)
 
+            #print(vertex)
+            #print(cur)
+            #print(result)
+            #print()
+
             if add_point(result,
                          x_coords,
                          y_coords,
+                         z_coords,
                          vert=vertex,
                          colors=colors):
-                cur = result.to_point3(self.projective)
+                cur = result.to_bigger_dimension(self.projective)
+                # cur = result.to_point3(self.projective)
 
             if self.double_mid:
                 for val in [rel, -rel]:
@@ -251,11 +296,18 @@ class Worker(QRunnable):
                     add_point(out,
                               x_coords,
                               y_coords,
+                              z_coords,
                               vert=vertex,
                               colors=colors)
 
-        return np.array(x_coords), np.array(y_coords), np.array(colors)
+        x_coords = np.array(x_coords)
+        y_coords = np.array(y_coords)
+        z_coords = np.array(z_coords)
+        colors = np.array(colors)
 
+        return x_coords, y_coords, z_coords, colors
+
+    # TODO
     def clean(self, x, y, colors):
         """Take quotient of points by current precision."""
         x = np.round(x, decimals=self.decimals)

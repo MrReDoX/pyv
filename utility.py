@@ -1,6 +1,5 @@
 """Widely used functions firstnd precision setting for isclose."""
 
-from math import inf, isclose
 
 from point import Point3
 
