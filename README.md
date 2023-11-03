@@ -6,7 +6,9 @@ Chaos game simulator. Interface is done with pyqtgraph, exporting with matplotli
 
 # Install
 
-I think dependices are these: [numpy](https://numpy.org/install/), [pyqtgraph](https://www.pyqtgraph.org/), python 3.10.9. I am working with the latest versions aviable for Arch Linux, other version haven't been tested.
+I think dependices are these: python 3.10.9, [pyqtgraph](https://pypi.org/project/pyqtgraph/), [matplotlib](https://pypi.org/project/matplotlib/), [PyOpenGL](https://pypi.org/project/PyOpenGL/), [shapely](https://pypi.org/project/shapely/). I am working with the latest versions aviable for Arch Linux, other version haven't been tested.
+
+One command `pip install pyqtgraph matplotlib pyopengl shapely`.
 
 # Run
 
@@ -19,16 +21,17 @@ Just do `python gui.py`. Press plot and contemplate.
 
 # regular $ n $-gon
 
-Build regular $ n $-gon with appropriate output
+Build regular $ n $-gon with center in $ c $ and radius $ r $
 
-```
-import cmath
-import math
+```python
+from cmath import exp
+from math import pi
 
 c = complex(0, -3)
+r = 2
 n = 7
 
-points = [c + 2 * cmath.exp(1j * (2 * math.pi * k) / n) for k in range(n)]
+points = [c + r^2 * exp(1j * (2 * pi * k) / n) for k in range(n)]
 
 for z in points:
     print(f'({z.real:.2f}:{z.imag:.2f}:1)')
