@@ -2,7 +2,6 @@
 
 # TODO:
 # 1. Fix checkers messages
-# 2. File name export settings
 
 import itertools
 import json
@@ -120,7 +119,7 @@ class Application:
 
             {'name': 'Стратегия',
              'type': 'str',
-             'value': '/home/redox/git/pyv/strategies/default.py'}
+             'value': f'{os.getcwd()}/strategies/default.py'}
         ]
 
         children_exp = [
@@ -140,22 +139,6 @@ class Application:
             {'name': 'Имя файла',
              'type': 'str',
              'value': '$color$_$lambda$_$verticies$.eps'},
-
-            # {'name': 'Вершины в имя файла',
-            #  'type': 'bool',
-            #  'value': True},
-
-            # {'name': 'Параметр \\lambda в имя файла',
-            #  'type': 'bool',
-            #  'value': True},
-
-            # {'name': 'Количество точек в имя файла',
-            #  'type': 'bool',
-            #  'value': False},
-
-            # {'name': 'colored в имя файла',
-            #  'type': 'bool',
-            #  'value': True}
         ]
 
         self.params = Parameter.create(name='Параметры',
@@ -220,10 +203,8 @@ class Application:
 
         # 2d, 3d tab on the bottom
         tab_widget = QTabWidget()
-        # tab_widget.addTab(self.graphics_widget_2d, '2d')
         tab_widget.addTab(self.graphics_widget_2d, '2d')
         tab_widget.addTab(self.graphics_widget_3d, '3d')
-        # tab_widget.setTabPosition(QTabWidget.TabPosition.South)
         tab_widget.setTabPosition(QTabWidget.TabPosition.South)
         tab_widget.currentChanged.connect(lambda: self.tab_changed(tab_widget,
                                                                    btn_plot,
@@ -260,7 +241,6 @@ class Application:
         if self.params.child('Случайные цвета').value():
             self.worker.vertices_colors = self.worker.gen_random_colors()
 
-        # self.worker.projective = self.params.child('projective').value()
         self.worker.double_mid =\
             self.params.child('Рисовать вторую середину').value()
 
@@ -315,18 +295,12 @@ class Application:
             if self.worker.frame_type == 1:
                 # Абсолют — окружность
                 points = np.linspace(0, 2 * pi, num=100)
-                # circle = pg.PlotCurveItem(np.cos(points),
-                #                           np.sin(points),
-                #                           pen=pg.mkPen(color),
-                #                           skipFiniteCheck=True)
 
                 circle = self.canvas_2d.plot()
                 circle.setData(np.cos(points),
                                np.sin(points),
                                pen=pg.mkPen(color),
                                skipFiniteCheck=True)
-
-                # self.canvas_2d.addItem(circle, row=0, col=0)
 
             if self.worker.frame_type == 2:
                 # Абсолют — гипербола yx - 1 = 0
