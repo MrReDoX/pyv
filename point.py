@@ -1,6 +1,6 @@
 """2 and 3 coordinate point class with convinient helping functions."""
 
-from math import isfinite
+from cmath import isfinite
 
 
 class Point2:
@@ -28,6 +28,14 @@ class Point2:
     def to_point3(self, new_z: float):
         """Convert to point with 3 coordinates."""
         return Point3(self.x, self.y, new_z)
+
+    def is_complex(self):
+        if isinstance(self.x, complex):
+            conds = [abs(t.imag) > 1e-15 for t in [self.x, self.y]]
+
+            return any(conds)
+
+        return False
 
 
     def to_float(self):

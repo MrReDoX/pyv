@@ -1,9 +1,8 @@
 """Main program module. Builds GUI and run program."""
 
 # TODO:
-# 1. If lambda is a list (e.g. 0.1, 0.3, 0.5, 0.7, 0.9) then plot and export for all such lambda automaticly
-# 2. Fix checkers messages
-# 3. Strategies
+# 1. Fix checkers messages
+# 2. File name export settings
 
 import itertools
 import json
@@ -17,7 +16,10 @@ import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.parametertree import Parameter, ParameterTree
-from pyqtgraph.Qt import QtGui, QtWidgets
+from pyqtgraph.Qt.QtGui import QAction
+from pyqtgraph.Qt.QtWidgets import (QFileDialog, QHBoxLayout, QMainWindow,
+                                    QPushButton, QSplitter, QTabWidget,
+                                    QVBoxLayout, QWidget)
 
 from exporter import Exporter2D
 from iterate import Worker
@@ -49,33 +51,7 @@ def parse_vertices(data: str) -> list:
     if len(paired[0]) == 3:
         return [Point3(x, y, z) for (x, y, z) in paired]
 
-    # for k in [-0.1, -0.2, -0.3, -0.4, -0.5]:
-    #     # t = [nPoint(x + k, y + k, z + k, w) for (x, y, z, w) in paired]
-    #     tp = []
-    #     for x, y, z, w in paired:
-    #         xp = round(x + k, 2)
-    #         yp = round(y + k, 2)
-    #         zp = round(z + k, 2)
-    #         tp.append((xp, yp, zp, 1.0))
-    #     print(*tp, sep='\n')
-    #     print()
-
     return [nPoint(x, y, z, w) for (x, y, z, w) in paired]
-
-
-#def parse_vertices_3d(data: str) -> list:
-#    """Parse vertices data from text box in format "(x1:y1:z1:w1)\n..."""
-#    improved_data = data.strip().replace(' ', '').replace(',', '.').split('\n')
-#
-#    # remove ( and )
-#    listed = [i[1:-1] for i in improved_data]
-#
-#    # make triples (x, y, z)
-#    paired = [tuple(map(float, i.split(':'))) for i in listed]
-#
-#    print(len(paired[0]))
-#
-#    return [nPoint(x, y, z, w) for (x, y, z, w) in paired]
 
 
 def parse_colors(data: str) -> list:
@@ -106,7 +82,7 @@ class Application:
         pg.setConfigOptions(antialias=True)
         self.app = pg.mkQApp('pyv')
 
-        self.main_window = QtWidgets.QMainWindow()
+        self.main_window = QMainWindow()
         self.main_window.setWindowTitle('pyv')
 
         children = [
@@ -114,14 +90,25 @@ class Application:
                              type='text',
                              value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
             {'name': 'Стартовая точка', 'type': 'str', 'value': ''},
-            {'name': 'Цвета точек', 'type': 'str', 'value': '#00406b, #008000, #781f19'},
+
+            {'name': 'Цвета точек',
+             'type': 'str',
+             'value': '#00406b, #008000, #781f19'},
+
             {'name': 'Случайные цвета', 'type': 'bool', 'value': False},
-            {'name': 'lambda', 'type': 'float', 'value': 1.0},
-            {'name': 'projective', 'type': 'float', 'value': 1.0},
-            {'name': 'Рисовать вторую середину', 'type': 'bool', 'value': False},
+            {'name': 'lambda', 'type': 'str', 'value': '1.0'},
+
+            {'name': 'Рисовать вторую середину',
+             'type': 'bool',
+             'value': False},
+
             {'name': 'Пределы', 'type': 'str', 'value': ''},
             {'name': 'Угадывать пределы', 'type': 'bool', 'value': False},
-            {'name': 'Угадывать пределы (включить абсолют)', 'type': 'bool', 'value': True},
+
+            {'name': 'Угадывать пределы (включить абсолют)',
+             'type': 'bool',
+             'value': True},
+
             {'name': 'Рисовать границы', 'type': 'bool', 'value': True},
             {'name': 'Ширина границ', 'type': 'float', 'value': 1.0},
             {'name': 'Рисовать абсолют', 'type': 'bool', 'value': True},
@@ -129,21 +116,46 @@ class Application:
             {'name': 'Количество точек', 'type': 'str', 'value': '2**14'},
             {'name': 'Размер точки', 'type': 'float', 'value': 1.0},
             {'name': 'Тип репера', 'type': 'int', 'value': 1},
-            Parameter.create(name='Checker', type='file')
+            Parameter.create(name='Checker', type='file'),
+
+            {'name': 'Стратегия',
+             'type': 'str',
+             'value': '/home/redox/git/pyv/strategies/default.py'}
         ]
 
         children_exp = [
             {'name': 'dpi', 'type': 'int', 'value': 5000},
-            {'name': 'Имя файла', 'type': 'str', 'value': ''},
-            {'name': 'Директория по умолчанию', 'type': 'str', 'value': os.getcwd()},
+
+            {'name': 'Директория по умолчанию',
+             'type': 'str',
+             'value': os.getcwd()},
+
             {'name': 'Расширение по умолчанию', 'type': 'str', 'value': 'eps'},
             {'name': 'Ширина линий абсолюта', 'type': 'float', 'value': 0.25},
             {'name': 'Ширина границ', 'type': 'float', 'value': 0.25},
             {'name': 'Размер точки', 'type': 'float', 'value': 0.25},
-            {'name': 'Рисовать оси', 'type': 'bool', 'value': False},
-            {'name': 'Параметр \\lambda в имя файла', 'type': 'bool', 'value': True},
-            {'name': 'Количество точек в имя файла', 'type': 'bool', 'value': False},
-            {'name': 'Растеризовать', 'type': 'bool', 'value': True}
+            {'name': 'Рисовать оси', 'type': 'bool', 'value': True},
+            {'name': 'Растеризовать', 'type': 'bool', 'value': True},
+
+            {'name': 'Имя файла',
+             'type': 'str',
+             'value': '$color$_$lambda$_$verticies$.eps'},
+
+            # {'name': 'Вершины в имя файла',
+            #  'type': 'bool',
+            #  'value': True},
+
+            # {'name': 'Параметр \\lambda в имя файла',
+            #  'type': 'bool',
+            #  'value': True},
+
+            # {'name': 'Количество точек в имя файла',
+            #  'type': 'bool',
+            #  'value': False},
+
+            # {'name': 'colored в имя файла',
+            #  'type': 'bool',
+            #  'value': True}
         ]
 
         self.params = Parameter.create(name='Параметры',
@@ -160,7 +172,8 @@ class Application:
         self.canvas_2d = self.graphics_widget_2d.getPlotItem()
         self.canvas_2d.setAspectLocked(True, 1.0)
 
-        # self.graphics_widget_3d = gl.GLViewWidget(rotationMethod='quaternion')
+        # self.graphics_widget_3d =\
+        #   gl.GLViewWidget(rotationMethod='quaternion')
         self.graphics_widget_3d = gl.GLViewWidget()
         self.graphics_widget_3d.setBackgroundColor('w')
 
@@ -171,12 +184,12 @@ class Application:
         self.canvas_2d.addItem(self.scatter_2d)
         self.graphics_widget_3d.addItem(self.scatter_3d)
 
-        action_export = QtGui.QAction(self.main_window)
+        action_export = QAction(self.main_window)
         action_export.setObjectName('actionExport')
         action_export.setText('Экспортировать')
         action_export.triggered.connect(self.export_conf)
 
-        action_import = QtGui.QAction(self.main_window)
+        action_import = QAction(self.main_window)
         action_import.setObjectName('actionImport')
         action_import.setText('Импортировать')
         action_import.triggered.connect(self.import_conf)
@@ -186,37 +199,37 @@ class Application:
         conf.addAction(action_export)
         conf.addAction(action_import)
 
-        btn_plot = QtWidgets.QPushButton('Plot')
+        btn_plot = QPushButton('Plot')
         btn_plot.setShortcut('Ctrl+Return')
 
-        btn_export = QtWidgets.QPushButton('Export')
+        btn_export = QPushButton('Export')
 
         btn_plot.clicked.connect(self.plot_2d)
         btn_export.clicked.connect(self.export_2d)
 
-        button_layout = QtWidgets.QHBoxLayout()
+        button_layout = QHBoxLayout()
         button_layout.addWidget(btn_plot)
         button_layout.addWidget(btn_export)
 
-        main_layout = QtWidgets.QVBoxLayout()
+        main_layout = QVBoxLayout()
         main_layout.addWidget(param_tree)
         main_layout.addLayout(button_layout)
 
-        params_and_buttons_widget = QtWidgets.QWidget()
+        params_and_buttons_widget = QWidget()
         params_and_buttons_widget.setLayout(main_layout)
 
         # 2d, 3d tab on the bottom
-        tab_widget = QtWidgets.QTabWidget()
+        tab_widget = QTabWidget()
         # tab_widget.addTab(self.graphics_widget_2d, '2d')
         tab_widget.addTab(self.graphics_widget_2d, '2d')
         tab_widget.addTab(self.graphics_widget_3d, '3d')
-        # tab_widget.setTabPosition(QtWidgets.QTabWidget.TabPosition.South)
-        tab_widget.setTabPosition(QtWidgets.QTabWidget.TabPosition.South)
+        # tab_widget.setTabPosition(QTabWidget.TabPosition.South)
+        tab_widget.setTabPosition(QTabWidget.TabPosition.South)
         tab_widget.currentChanged.connect(lambda: self.tab_changed(tab_widget,
                                                                    btn_plot,
                                                                    btn_export))
 
-        splitter = QtWidgets.QSplitter()
+        splitter = QSplitter()
         splitter.addWidget(tab_widget)
         splitter.addWidget(params_and_buttons_widget)
 
@@ -228,9 +241,11 @@ class Application:
 
     def read_config(self):
         """Read GUI settings and write them to variables."""
-        self.worker.vertices = parse_vertices(self.params.child('Вершины').value())
+        self.worker.vertices =\
+            parse_vertices(self.params.child('Вершины').value())
 
-        self.worker.start_point = parse_m(self.params.child('Стартовая точка').value())
+        self.worker.start_point =\
+            parse_m(self.params.child('Стартовая точка').value())
         if not self.params.child('Стартовая точка').value():
             self.worker.start_point = self.worker.gen_start_point()
 
@@ -239,19 +254,23 @@ class Application:
             self.worker.vertices_colors = parse_colors(val)
 
         if not self.params.child('Цвета точек').value():
-            self.worker.vertices_colors = ['#000000'] * len(self.worker.vertices)
+            self.worker.vertices_colors =\
+                ['#000000'] * len(self.worker.vertices)
 
         if self.params.child('Случайные цвета').value():
             self.worker.vertices_colors = self.worker.gen_random_colors()
 
-        self.worker.projective = self.params.child('projective').value()
-        self.worker.double_mid = self.params.child('Рисовать вторую середину').value()
+        # self.worker.projective = self.params.child('projective').value()
+        self.worker.double_mid =\
+            self.params.child('Рисовать вторую середину').value()
 
-        xmin, xmax, ymin, ymax = parse_limits(self.params.child('Пределы').value())
+        xmin, xmax, ymin, ymax =\
+            parse_limits(self.params.child('Пределы').value())
         if not self.params.child('Пределы').value():
             xmin, xmax, ymin, ymax = self.worker.guess_limits()
             if self.params.child('Угадывать пределы (включить абсолют)').value():
-                xmin, xmax, ymin, ymax = self.worker.guess_limits(contains_absolute=True)
+                xmin, xmax, ymin, ymax =\
+                    self.worker.guess_limits(contains_absolute=True)
 
         self.worker.xmin, self.worker.xmax = xmin, xmax
         self.worker.ymin, self.worker.ymax = ymin, ymax
@@ -264,6 +283,12 @@ class Application:
             module = __import__(Path(val).stem)
 
             self.worker.checker = module.checker
+
+        if val := self.params.child('Стратегия').value():
+            sys.path.append(os.path.dirname(val))
+            module = __import__(Path(val).stem)
+
+            self.worker.strategy = module.strategy
 
         if self.params.child('Рисовать границы').value():
             width = 3.0
@@ -332,9 +357,9 @@ class Application:
                                              skipFiniteCheck=True)
                 self.canvas_2d.addItem(hyperbole)
 
-    def plot_2d(self):
+    def plot_2d(self, rel=None, export_function=None):
         """Run chaos game and plot with ScatterPlot."""
-        self.main_window.setWindowTitle('pyv BUSY')
+        self.main_window.setWindowTitle('pyv PLOTTING')
         self.canvas_2d.clear()
         self.canvas_2d.addItem(self.scatter_2d)
 
@@ -343,7 +368,8 @@ class Application:
         self.worker = Worker()
         self.read_config()
 
-        relation = self.params.child('lambda').value()
+        if not rel:
+            rel = float(list(self.params.child('lambda').value().replace(' ', '').split(','))[0])
         cnt = eval(self.params.child("Количество точек").value())
 
         size = 1.0
@@ -353,10 +379,6 @@ class Application:
         def work_finished(x, y, colors):
             x, y, colors = self.worker.clean(x, y, colors)
 
-            self.x = x
-            self.y = y
-            self.colors = colors
-
             self.scatter_2d.setData(x=x,
                                     y=y,
                                     size=size,
@@ -364,30 +386,33 @@ class Application:
 
             self.main_window.setWindowTitle('pyv DONE')
 
+            if export_function:
+                export_function(x, y, colors, rel)
+
         # run in separate thread
-        self.worker.args=(cnt,)
-        self.worker.kwargs={'rel': relation}
+        self.worker.args = (cnt,)
+        self.worker.kwargs = {'rel': rel}
         self.worker.signals.result.connect(work_finished)
+
         self.worker.threadpool.start(self.worker)
 
-    # TODO:
-    # 1. draw parallelepiped
-    # 2. parse_vertices round
     def plot_3d(self):
         """Run chaos game and plot with GLScatterPlot."""
-        self.main_window.setWindowTitle('pyv BUSY')
+        self.main_window.setWindowTitle('pyv PLOTTING')
 
         self.graphics_widget_3d.clear()
         self.graphics_widget_3d.addItem(self.scatter_3d)
 
         self.worker_3d = Worker3D()
-        self.worker_3d.vertices = parse_vertices(self.params.child('Вершины').value())
+        self.worker_3d.vertices =\
+            parse_vertices(self.params.child('Вершины').value())
         self.worker_3d.start_point = nPoint(1, 1, 1)
         self.worker_3d.start_point = self.worker_3d.gen_start_point()
         self.worker_3d.vertices_colors = self.worker_3d.gen_random_colors()
 
         # draw boundary
-        lower = [i.to_lower_dimension().to_tuple() for i in self.worker_3d.vertices]
+        lower = [i.to_lower_dimension().to_tuple()
+                 for i in self.worker_3d.vertices]
         # lower += [lower[-1]]
         # for cur, nex in zip(lower, lower[1:]):
         #     # print(np.shape(np.array([cur, nex])))
@@ -401,34 +426,36 @@ class Application:
         lower_first = lower[:4]
         lower_first += [lower_first[0]]
         for cur, nex in zip(lower_first, lower_first[1:]):
-             line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
-                                      color=pg.glColor('k'),
-                                      width=5,
-                                      antialias=True)
+            line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
+                                     color=pg.glColor('k'),
+                                     width=5,
+                                     antialias=True)
 
-             self.graphics_widget_3d.addItem(line)
+            self.graphics_widget_3d.addItem(line)
 
         lower_second = lower[4:]
         lower_second += [lower_second[0]]
         for cur, nex in zip(lower_second, lower_second[1:]):
-             line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
-                                      color=pg.glColor('k'),
-                                      width=5,
-                                      antialias=True)
+            line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
+                                     color=pg.glColor('k'),
+                                     width=5,
+                                     antialias=True)
 
-             self.graphics_widget_3d.addItem(line)
+            self.graphics_widget_3d.addItem(line)
 
         for cur, nex in zip(lower[:4], lower[4:]):
-             line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
-                                      color=pg.glColor('k'),
-                                      width=5,
-                                      antialias=True)
+            line = gl.GLLinePlotItem(pos=np.array([cur, nex]),
+                                     color=pg.glColor('k'),
+                                     width=5,
+                                     antialias=True)
 
-             self.graphics_widget_3d.addItem(line)
+            self.graphics_widget_3d.addItem(line)
 
         # draw absolute
         mesh_data = gl.MeshData.sphere(rows=128, cols=128)
-        sphere = gl.GLMeshItem(meshdata=mesh_data, smooth=True, color=pg.glColor('r'))
+        sphere = gl.GLMeshItem(meshdata=mesh_data,
+                               smooth=True,
+                               color=pg.glColor('r'))
         self.graphics_widget_3d.addItem(sphere)
 
         # create three grids, add each to the view
@@ -476,30 +503,37 @@ class Application:
             self.main_window.setWindowTitle('pyv DONE')
 
         # run in separate thread
-        self.worker_3d.args=(cnt,)
-        self.worker_3d.kwargs={'rel': relation}
+        self.worker_3d.args = (cnt,)
+        self.worker_3d.kwargs = {'rel': relation}
         self.worker_3d.signals.result.connect(work_finished)
         self.worker_3d.threadpool.start(self.worker_3d)
 
-    # TODO:
-    # Multithreading on export:
-    # 1. Separate class
-    # 2. Compress params to dict
-    # 3. Pass params as argument
     def export_2d(self):
         """Export image file with matplotlib."""
         self.main_window.setWindowTitle('pyv EXPORTING')
 
+        def plot_finished(x, y, colors, rel):
+            self.main_window.setWindowTitle('pyv EXPORTING')
+
+            exporter = Exporter2D()
+            exporter.args = (self.worker, self.params, self.params_exp,
+                             x, y, colors, rel)
+            exporter.kwargs = {}
+            exporter.signals.finished.connect(work_finished)
+
+            exporter.threadpool.start(exporter)
+
         def work_finished():
             self.main_window.setWindowTitle('pyv DONE')
 
-        exporter = Exporter2D()
-        exporter.args=(self.worker, self.params, self.params_exp,
-                       self.x, self.y, self.colors)
-        exporter.kwargs={}
-        exporter.signals.finished.connect(work_finished)
-        exporter.threadpool.start(exporter)
+            if relations:
+                self.plot_2d(rel=relations.pop(),
+                             export_function=plot_finished)
 
+        relations = set(map(float,
+                            self.params.child('lambda').value().replace(' ', '').split(',')))
+
+        self.plot_2d(rel=relations.pop(), export_function=plot_finished)
 
     def export_3d(self):
         """TODO."""
@@ -516,7 +550,6 @@ class Application:
         # № 3
         # matplotlib?
 
-
     def export_conf(self):
         """Write current configuration to the JSON file."""
         default_name = ''
@@ -530,7 +563,7 @@ class Application:
         default_name += '.json'
 
         filt = 'Json File (*.json)'
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+        path, _ = QFileDialog.getSaveFileName(
             parent=self.main_window,
             caption='Выберите файл',
             directory=os.getcwd() + f'/{default_name}',
@@ -553,7 +586,7 @@ class Application:
     def import_conf(self):
         """Read parameters trees from the JSON file."""
         filt = 'Json File (*.json)'
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+        path, _ = QFileDialog.getOpenFileName(
             parent=self.main_window,
             caption='Выберите файл',
             directory=os.getcwd(),

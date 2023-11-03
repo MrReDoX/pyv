@@ -1,7 +1,8 @@
-# eps -> pdf
-for a in ./23_09_2023/*
+# Usage example:
+#   ./eps_to_pdf "tmp/*"
+for a in $1
 do
-  ps2pdf -r2500 $a;
+  ps2pdf -r5000 $a;
   # printf $a
 done
 

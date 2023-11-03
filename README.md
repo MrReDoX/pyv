@@ -22,8 +22,8 @@ Just do `python gui.py`. Press plot and contemplate.
 Build regular $ n $-gon with appropriate output
 
 ```
-import math
 import cmath
+import math
 
 c = complex(0, -3)
 n = 7

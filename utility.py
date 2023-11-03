@@ -3,7 +3,7 @@
 
 from point import Point3
 
-PRECISION = 1e-3
+PRECISION = 1e-4
 
 
 def u1(first: Point3, second: Point3) -> float:

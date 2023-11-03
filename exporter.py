@@ -1,12 +1,13 @@
+"""Module responsible for 2d export."""
+
 import itertools
 import os
 from math import ceil
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pyqtgraph.Qt.QtCore import *
-from pyqtgraph.Qt.QtGui import *
-from pyqtgraph.Qt.QtWidgets import *
+from pyqtgraph.Qt.QtCore import (QObject, QRunnable, QThreadPool, pyqtSignal,
+                                 pyqtSlot)
 
 
 class ExporterSignals(QObject):
@@ -17,26 +18,17 @@ class ExporterSignals(QObject):
 
     finished
         No data
-
-    error
-        tuple (exctype, value, traceback.format_exc() )
-
-    result
-        object data returned from processing, anything
-
     '''
     finished = pyqtSignal()
-    error = pyqtSignal(tuple)
-    result = pyqtSignal(object, object, object)
 
 
 class Exporter2D(QRunnable):
+    """Class managing matplotlib export"""
     def __init__(self):
-        # For threading
         super().__init__()
         self.threadpool = QThreadPool()
-        self.args = None
-        self.kwargs = None
+        self.args = ()
+        self.kwargs = {}
         self.signals = ExporterSignals()
 
         self.params = None
@@ -44,11 +36,12 @@ class Exporter2D(QRunnable):
 
     @pyqtSlot()
     def run(self):
+        """QThread magic."""
         self.export_2d(*self.args, **self.kwargs)
 
         self.signals.finished.emit()
 
-    def export_2d(self, worker, params, params_exp, x, y, colors):
+    def export_2d(self, worker, params, params_exp, x, y, colors, lamb):
         """Export image file with matplotlib."""
         plt.gca().set_aspect('equal', adjustable='box')
 
@@ -114,32 +107,33 @@ class Exporter2D(QRunnable):
         if value := params_exp.child('Директория по умолчанию').value():
             directory = value
 
-        file_name = ''
+        file_name = params_exp.child('Имя файла').value()
+        while (left_idx := file_name.find('$')) != -1:
+            right_idx = file_name.find('$', left_idx + 1)
 
-        if params.child('Случайные цвета').value() or params.child('Цвета точек').value():
-            file_name += 'colored_'
+            # slice without $
+            command = file_name[left_idx + 1:right_idx]
 
-        if params_exp.child('Количество точек в имя файла').value():
-            file_name += f'_{params.child("Количество точек").value()}'
+            ans = ''
+            if command == 'color':
+                ans = 'bw'
+                if params.child('Случайные цвета').value()\
+                        or params.child('Цвета точек').value():
+                    ans = 'colored'
 
-        if params_exp.child('Параметр \\lambda в имя файла').value():
-            file_name += f'_{params.child("lambda").value()}'
+            elif command == 'lambda':
+                ans = f'{lamb:.2f}'
+            elif command == 'verticies':
+                for i in worker.vertices:
+                    ans += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
 
-        for i in worker.vertices:
-            file_name += f'_({i.x:.1f}:{i.y:.1f}:{i.z:.1f})'
+            file_name = file_name[:left_idx] + ans + file_name[right_idx + 1:]
 
         if file_name[0] == '_':
             file_name = file_name[1:]
 
         while file_name.find('__') != -1:
             file_name = file_name.replace('__', '_')
-
-        if val := params_exp.child('Имя файла').value():
-            file_name = val
-
-        extension = 'eps'
-        if value := params_exp.child('Расширение по умолчанию').value():
-            extension = value
 
         # directory += f'/{file_name}.{extension}'
 
@@ -174,7 +168,7 @@ class Exporter2D(QRunnable):
                     s=size,
                     edgecolors='none',
                     rasterized=rasterized)
-        plt.savefig(f'{directory}/{file_name}.{extension}', dpi=dpi)
+        plt.savefig(f'{directory}/{file_name}', dpi=dpi)
 
         plt.close()
         plt.cla()

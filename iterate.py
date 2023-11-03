@@ -6,9 +6,8 @@ from random import choice, uniform
 from typing import List, Tuple
 
 import numpy as np
-from pyqtgraph.Qt.QtCore import *
-from pyqtgraph.Qt.QtGui import *
-from pyqtgraph.Qt.QtWidgets import *
+from pyqtgraph.Qt.QtCore import (QObject, QRunnable, QThreadPool, pyqtSignal,
+                                 pyqtSlot)
 from shapely.geometry import Point, Polygon
 
 from point import Point2, Point3
@@ -21,34 +20,28 @@ class WorkerSignals(QObject):
 
     Supported signals are:
 
-    finished
-        No data
-
-    error
-        tuple (exctype, value, traceback.format_exc() )
-
     result
-        object data returned from processing, anything
+        numpy arrays x, y, colors returned
 
     '''
-    finished = pyqtSignal()
-    error = pyqtSignal(tuple)
     result = pyqtSignal(object, object, object)
 
 
 class Worker(QRunnable):
     """Main class that «plays» chaos game with settings."""
+
     def __init__(self):
         # For threading
-        super(Worker, self).__init__()
+        super().__init__()
         self.threadpool = QThreadPool()
-        self.args = None
-        self.kwargs = None
+        self.args = ()
+        self.kwargs = {}
         self.signals = WorkerSignals()
 
         self.start_point = Point2(0.0, 0.0)
         self._vertices = []
         self.checker = self.convex_trick
+        self.strategy = lambda verticies, prev: choice(verticies)
         self.vertices_colors = []
         self.double_mid = False
         self.projective = 1
@@ -173,20 +166,34 @@ class Worker(QRunnable):
                                                    third_coord)
 
         if not isclose(abs(rel), 1, rel_tol=self.precision):
-            from mid_first_lambda import first_coord, second_coord, third_coord
+            from mid_first_lambda_old import first_coord, second_coord, third_coord
 
         x = first_coord(vertex, cur, rel)
         y = second_coord(vertex, cur, rel)
         z = third_coord(vertex, cur, rel)
 
-        answer = Point3(x, y, z).to_point2().to_float()
+        answer = Point3(x, y, z).to_point2()
+
+        # if answer.is_complex():
+        #     # print('COMPLEX!!!')
+        #     # print(answer, '\n')
+        #     return Point2(inf, inf)
+
+        answer = answer.to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
             x = first_coord(vertex, cur, -rel)
             y = second_coord(vertex, cur, -rel)
             z = third_coord(vertex, cur, -rel)
 
-            answer = Point3(x, y, z).to_point2().to_float()
+            answer = Point3(x, y, z).to_point2()
+
+        # if answer.is_complex():
+        #     # print('COMPLEX!!!')
+        #     # print(answer, '\n')
+        #     return Point2(inf, inf)
+
+        answer = answer.to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
             return Point2(inf, inf)
@@ -225,17 +232,20 @@ class Worker(QRunnable):
 
             return True
 
-        x_coords:List[float] = []
-        y_coords:List[float] = []
-        colors:List[str] = []
+        x_coords: List[float] = []
+        y_coords: List[float] = []
+        colors: List[str] = []
 
+        prev = []
         cur = self.start_point.to_point3(self.projective)
 
         print(cur)
 
         # while len(x_coords) < cnt:
         for _ in range(cnt):
-            vertex = choice(self.vertices)
+            vertex = self.strategy(self.vertices, prev)
+            prev.append(vertex)
+
             result = self.div_in_rel(vertex, cur, rel=rel)
 
             if add_point(result,
