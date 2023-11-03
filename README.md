@@ -6,9 +6,9 @@ Chaos game simulator. Interface is done with pyqtgraph, exporting with matplotli
 
 # Install
 
-I think dependices are these: python 3.10.9, [pyqtgraph](https://pypi.org/project/pyqtgraph/), [matplotlib](https://pypi.org/project/matplotlib/), [PyOpenGL](https://pypi.org/project/PyOpenGL/), [shapely](https://pypi.org/project/shapely/). I am working with the latest versions aviable for Arch Linux, other version haven't been tested.
+I think dependices are these: python 3.10.9, [PyQt6](https://pypi.org/project/PyQt6/) or [PySide6](https://pypi.org/project/PySide6/), [pyqtgraph](https://pypi.org/project/pyqtgraph/), [matplotlib](https://pypi.org/project/matplotlib/), [PyOpenGL](https://pypi.org/project/PyOpenGL/), [shapely](https://pypi.org/project/shapely/). I am working with the latest versions aviable for Arch Linux, other version haven't been tested.
 
-One command `pip install pyqtgraph matplotlib pyopengl shapely`.
+One command `pip install pyqtgraph matplotlib pyopengl shapely pyqt6` or `pip install pyqtgraph matplotlib pyopengl shapely pyside6`.
 
 # Run
 
