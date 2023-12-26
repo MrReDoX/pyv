@@ -84,43 +84,6 @@ def omegaII(a: nPoint, b: nPoint) -> float:
 
     return numerator / deltaII(a, b)
 
-#def phi(a: nPoint) -> float:
-#    return a[0]**2 + a[1]**2 - a[3]**2
-#
-#def phi_elliptic(a: nPoint) -> float:
-#    return a[0]**2 + a[1]**2 + a[2]**2
-
-# def get_coords_cal(a: nPoint, b: nPoint, eps=1) -> float:
-#     """Get coordinates of a point or (∞,∞,∞,∞) if something bad."""
-#
-#     s = [0 for i in range(4)]
-#     if p(a, b, 1, 4) == p(a, b, 2, 4) == p(a, b, 3, 4) == 0:
-#         underroot = phi_elliptic(a) * phi_elliptic(b)
-#
-#         if underroot < 0:
-#             s[i] = inf
-#
-#             return
-#
-#         for i in range(3):
-#             s[i] = a[i] * a[1] * phi_elliptic(b) - b[i] * b[1] * phi_elliptic(a)\
-#                     + eps * p(a, b, i, 2) * sqrt(underroot)
-#
-#         return nPoint(*s)
-#
-#     for i in range(4):
-#         underroot = phi(a) * phi(b)
-#
-#         if underroot < 0:
-#             s[i] = inf
-#
-#             return
-#
-#         s[i] = a[i] * a[3] * phi(b) - b[i] * b[3] * phi(a)\
-#                + eps * sqrt(underroot)
-#
-#     return nPoint(*s)
-
 def get_coords(a: nPoint, b: nPoint, eps=1) -> nPoint:
     """Compute coordinates of «middle»."""
     p14 = p(a, b, 1, 4)

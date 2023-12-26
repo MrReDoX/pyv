@@ -56,7 +56,7 @@ class Exporter2D(QRunnable):
 
             if worker.frame_type == 1:
                 par = {'color': color, 'linewidth': linewidth}
-                theta = np.linspace(0, 2 * np.pi, 2**10)
+                theta = np.linspace(0, 2 * np.pi, 2**14)
                 x_coords = np.cos(theta)
                 y_coords = np.sin(theta)
                 plt.plot(x_coords, y_coords, **par)
@@ -81,9 +81,6 @@ class Exporter2D(QRunnable):
 
                 y_coords = list(map(lambda x: 1 / x, x_coords))
                 plt.plot(x_coords, y_coords, c=color, linewidth=linewidth)
-
-        plt.xlim(worker.xmin - 2, worker.xmax + 2)
-        plt.ylim(worker.ymin - 2, worker.ymax + 2)
 
         if params.child('Рисовать границы').value():
             width = 0.25
@@ -135,21 +132,7 @@ class Exporter2D(QRunnable):
         while file_name.find('__') != -1:
             file_name = file_name.replace('__', '_')
 
-        # directory += f'/{file_name}.{extension}'
-
-        # path, _ = QtWidgets.QFileDialog.getSaveFileName(
-        #     parent=main_window,
-        #     caption='Выберите файл',
-        #     directory=directory
-        # )
-
-        # directory, file_name = os.path.split(path)
-        # print(directory)
-        # print(file_name)
-
         if not file_name:
-            # main_window.setWindowTitle('pyv DONE')
-
             return
 
         dpi = 600
@@ -173,5 +156,3 @@ class Exporter2D(QRunnable):
         plt.close()
         plt.cla()
         plt.clf()
-
-        # self.main_window.setWindowTitle('pyv DONE')

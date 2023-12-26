@@ -206,37 +206,15 @@ class Worker3D(QRunnable):
                    rel=1,
                    inside=True) -> Point2:
         """Main method that divides «segment» in appropriate relation."""
-
         answer = get_coords(vertex, cur, rel).to_lower_dimension()
-
-        # x = first_coord(vertex, cur, rel)
-        # y = second_coord(vertex, cur, rel)
-        # z = third_coord(vertex, cur, rel)
-
-        # answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
             answer = get_coords(vertex, cur, -rel).to_lower_dimension()
-            #x = first_coord(vertex, cur, -rel)
-            #y = second_coord(vertex, cur, -rel)
-            #z = third_coord(vertex, cur, -rel)
-
-            #answer = Point3(x, y, z).to_point2().to_float()
 
         if not answer.isfinite() or self.checker(answer) != inside:
             return Point3(inf, inf, inf)
 
         return answer
-
-    # def profile(func):
-    #     """Decorator for run function profile"""
-    #     def wrapper(*args, **kwargs):
-    #         profile_filename = func.__name__ + '.prof'
-    #         profiler = cProfile.Profile()
-    #         result = profiler.runcall(func, *args, **kwargs)
-    #         profiler.dump_stats(profile_filename)
-    #         return result
-    #     return wrapper
 
     @pyqtSlot()
     def run(self):

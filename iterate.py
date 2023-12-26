@@ -1,7 +1,7 @@
 """Module that perfoms chaos game on plane."""
 
-# import cProfile
-from math import inf, isclose
+from cmath import inf, isclose, pi
+from math import acos, sqrt
 from random import choice, uniform
 from typing import List, Tuple
 
@@ -9,9 +9,10 @@ import numpy as np
 from pyqtgraph.Qt.QtCore import (QObject, QRunnable, QThreadPool, pyqtSignal,
                                  pyqtSlot)
 from shapely.geometry import Point, Polygon
+from shapely.prepared import prep
 
 from point import Point2, Point3
-from utility import PRECISION, u1, u2, u3
+from utility import PRECISION, harmonic, line_intersection, u1, u2, u3
 
 
 class WorkerSignals(QObject):
@@ -40,7 +41,7 @@ class Worker(QRunnable):
 
         self.start_point = Point2(0.0, 0.0)
         self._vertices = []
-        self.checker = self.convex_trick
+        self.checker = self.shapely_default
         self.strategy = lambda verticies, prev: choice(verticies)
         self.vertices_colors = []
         self.double_mid = False
@@ -48,7 +49,7 @@ class Worker(QRunnable):
         self.frame_type = 2
 
         self.precision = PRECISION
-        self.decimals = 3
+        self.decimals = 9
 
         self.xmin = -inf
         self.xmax = inf
@@ -60,16 +61,6 @@ class Worker(QRunnable):
     def vertices(self) -> list:
         """Getter for vertices of triangle, rectangle etc."""
         return self._vertices
-
-    # @property
-    # def x(self) -> list:
-    #     """Getter for x coordinates of chaos game points."""
-    #     return list(self._x)
-
-    # @property
-    # def y(self) -> list:
-    #     """Getter for y coordinates of chaos game points."""
-    #     return list(self._y)
 
     @property
     def colors(self) -> list:
@@ -84,23 +75,20 @@ class Worker(QRunnable):
         pairs = [(i.to_point2().x, i.to_point2().y) for i in self.vertices]
 
         self.poly = Polygon(pairs)
+        self.poly_prep = prep(self.poly)
 
     def gen_random_colors(self) -> list:
         """Generating random colors in format #123456 for each vertex."""
         data = '0123456789ABCDEF'
 
-        def gen() -> str:
-            return '#' + ''.join([choice(data) for j in range(6)])
-
-        answer = [gen() for i in range(len(self.vertices))]
+        answer = ['#' + ''.join([choice(data) for j in range(6)])
+                  for i in range(len(self.vertices))]
 
         return answer
 
-    # TODO: rewrite using cp algorithm
-    # https://cp-algorithms.com/geometry/point-in-convex-polygon.html
-    def convex_trick(self, point: Point2) -> bool:
+    def shapely_default(self, point: Point2) -> bool:
         """Use built-in shapely method to check that points fit."""
-        return Point(point.x, point.y).within(self.poly)
+        return self.poly_prep.contains(Point(point.x, point.y))
 
     def gen_start_point(self) -> Point2:
         """Randomly choose starting point."""
@@ -110,7 +98,7 @@ class Worker(QRunnable):
         y = uniform(miny, maxy)
 
         # Point is from shapely.geometry
-        while not self.poly.contains(Point(x, y)):
+        while not self.poly_prep.contains(Point(x, y)):
             x = uniform(minx, maxx)
             y = uniform(miny, maxy)
 
@@ -149,69 +137,146 @@ class Worker(QRunnable):
                    rel=1,
                    inside=True) -> Point2:
         """Main method that divides «segment» in appropriate relation."""
-        from mid_first_type import first_coord, second_coord, third_coord
 
+        from mid_first_lambda import coord
         val = u1(vertex, cur)**2 + u2(vertex, cur)**2 - u3(vertex, cur)**2
-        if isclose(abs(val), 0, rel_tol=self.precision):
-            # assume frame_type == 1
-            from mid_parab_first_type import (first_coord, second_coord,
-                                              third_coord)
+        scal = vertex.x * cur.x + vertex.y * cur.y - vertex.z - cur.z
 
-        if self.frame_type == 2:
-            from mid_second_type import first_coord, second_coord, third_coord
+        conds = [isclose(abs(val), 0, rel_tol=self.precision),
+                 isclose(abs(scal), 0, rel_tol=self.precision),
+                 val > 0]
+        if all(conds):
+            p1 = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
+                        coord(2, vertex, cur, 1 / (1 + rel)),
+                        coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
 
-            val = 4 * u1(vertex, cur) * u2(vertex, cur) - u3(vertex, cur)**2
-            if isclose(abs(val), 0, rel_tol=self.precision):
-                from mid_parab_second_type import (first_coord, second_coord,
-                                                   third_coord)
+            p2 = Point3(coord(1, vertex, cur, -1 / (1 + rel)),
+                        coord(2, vertex, cur, -1 / (1 + rel)),
+                        coord(3, vertex, cur, -1 / (1 + rel))).to_point2().to_float()
 
-        if not isclose(abs(rel), 1, rel_tol=self.precision):
-            from mid_first_lambda_old import first_coord, second_coord, third_coord
+            if not p1.isfinite() and not p2.isfinite():
+                return Point2(inf, inf)
 
-        x = first_coord(vertex, cur, rel)
-        y = second_coord(vertex, cur, rel)
-        z = third_coord(vertex, cur, rel)
+            if self.checker(p1) == inside:
+                return p1
 
-        answer = Point3(x, y, z).to_point2()
+            if self.checker(p2) == inside:
+                return p2
 
-        # if answer.is_complex():
-        #     # print('COMPLEX!!!')
-        #     # print(answer, '\n')
-        #     return Point2(inf, inf)
-
-        answer = answer.to_float()
-
-        if not answer.isfinite() or self.checker(answer) != inside:
-            x = first_coord(vertex, cur, -rel)
-            y = second_coord(vertex, cur, -rel)
-            z = third_coord(vertex, cur, -rel)
-
-            answer = Point3(x, y, z).to_point2()
-
-        # if answer.is_complex():
-        #     # print('COMPLEX!!!')
-        #     # print(answer, '\n')
-        #     return Point2(inf, inf)
-
-        answer = answer.to_float()
-
-        if not answer.isfinite() or self.checker(answer) != inside:
             return Point2(inf, inf)
 
-        return answer
+        if isclose(abs(val), 0, rel_tol=self.precision):
+            from mid_first_lambda_parabolic import coord
 
-    # def profile(func):
-    #     """Decorator for run function profile"""
-    #     def wrapper(*args, **kwargs):
-    #         profile_filename = func.__name__ + '.prof'
-    #         profiler = cProfile.Profile()
-    #         result = profiler.runcall(func, *args, **kwargs)
-    #         profiler.dump_stats(profile_filename)
-    #         return result
-    #     return wrapper
+            ans = Point3(coord(1, vertex, cur, rel),
+                         coord(2, vertex, cur, rel),
+                         coord(3, vertex, cur, rel)).to_point2().to_float()
+
+            if not ans.isfinite():
+                return Point2(inf, inf)
+
+            return ans
+        if val > 0:
+            ans = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
+                         coord(2, vertex, cur, 1 / (1 + rel)),
+                         coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
+
+            if not ans.isfinite():
+                return Point2(inf, inf)
+
+            return ans
+
+        vertices_2d = [i.to_point2() for i in self._vertices]
+        vertices_2d += [vertices_2d[0]]
+        vertices_zipped = zip(vertices_2d, vertices_2d[1:])
+
+        h_points = []
+        for bi, bj in vertices_zipped:
+            vertex_2d = vertex.to_point2()
+            cur_2d = cur.to_point2()
+
+            h_points.append(line_intersection(bi.x, bi.y,
+                                              bj.x, bj.y,
+                                              vertex_2d.x, vertex_2d.y,
+                                              cur_2d.x, cur_2d.y))
+
+        h_points = list(filter(lambda t: t.isfinite() and t != vertex, h_points))
+
+        h = h_points.pop()
+
+        u_1 = u1(vertex, cur)
+        u_2 = u2(vertex, cur)
+        u_3 = u3(vertex, cur)
+
+        vertex_star = Point3(-vertex.y * u_3 - vertex.z * u_2,
+                             vertex.x * u_3 + vertex.z * u_1,
+                             vertex.y * u_1 - vertex.x * u_2)
+
+        if harmonic(cur, vertex, h, vertex_star) > 0:
+            ans = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
+                         coord(2, vertex, cur, 1 / (1 + rel)),
+                         coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
+
+            good_conds = [ans.isfinite(), self.checker(ans) == inside]
+
+            if not all(good_conds):
+                return Point2(inf, inf)
+
+            return ans
+
+        vertex_phi = sqrt(vertex.x**2 + vertex.y**2 - vertex.z**2)
+        cur_phi = sqrt(cur.x**2 + cur.y**2 - cur.z**2)
+
+        phi = acos(abs(scal) / (vertex_phi * cur_phi))
+
+        if isclose(rel, (pi - 2 * phi) / pi, rel_tol=1e-15):
+            return vertex_star.to_point2().to_float()
+
+        if isclose(rel, pi / (pi - 2 * phi), rel_tol=1e-15):
+            cur_star = Point3(-cur.y * u_3 - cur.z * u_2,
+                              cur.x * u_3 + cur.z * u_1,
+                              cur.y * u_1 - cur.x * u_2)
+
+            return cur_star.to_point2().to_float()
+
+        if rel < (pi - 2 * phi) / pi:
+            ans = Point3(coord(1, vertex, cur, (1 + 2 * rel) / (1 + rel)),
+                         coord(2, vertex, cur, (1 + 2 * rel) / (1 + rel)),
+                         coord(3, vertex, cur, (1 + 2 * rel) / (1 + rel))).to_point2().to_float()
+
+            good_conds = [ans.isfinite(), self.checker(ans) == inside]
+
+            if not all(good_conds):
+                return Point2(inf, inf)
+
+            return ans
+
+        if (pi - 2 * phi) / pi < rel < pi / (pi - 2 * phi):
+            ans = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
+                         coord(2, vertex, cur, 1 / (1 + rel)),
+                         coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
+
+            good_conds = [ans.isfinite(), self.checker(ans) == inside]
+
+            if not all(good_conds):
+                return Point2(inf, inf)
+
+            return ans
+
+        ans = Point3(coord(1, vertex, cur, -1 / (1 + rel)),
+                     coord(2, vertex, cur, -1 / (1 + rel)),
+                     coord(3, vertex, cur, -1 / (1 + rel))).to_point2().to_float()
+
+        good_conds = [ans.isfinite(), self.checker(ans) == inside]
+
+        if not all(good_conds):
+            return Point2(inf, inf)
+
+        return ans
 
     @pyqtSlot()
     def run(self):
+        """Method that runs when thread starts."""
         x, y, colors = self.work(*self.args, **self.kwargs)
 
         self.signals.result.emit(x, y, colors)
@@ -241,7 +306,6 @@ class Worker(QRunnable):
 
         print(cur)
 
-        # while len(x_coords) < cnt:
         for _ in range(cnt):
             vertex = self.strategy(self.vertices, prev)
             prev.append(vertex)

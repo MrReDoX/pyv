@@ -19,6 +19,7 @@ from pyqtgraph.Qt.QtGui import QAction
 from pyqtgraph.Qt.QtWidgets import (QFileDialog, QHBoxLayout, QMainWindow,
                                     QPushButton, QSplitter, QTabWidget,
                                     QVBoxLayout, QWidget)
+from seval import safe_eval
 
 from exporter import Exporter2D
 from iterate import Worker
@@ -112,7 +113,7 @@ class Application:
             {'name': 'Ширина границ', 'type': 'float', 'value': 1.0},
             {'name': 'Рисовать абсолют', 'type': 'bool', 'value': True},
             {'name': 'Цвет абсолюта', 'type': 'str', 'value': '#000000'},
-            {'name': 'Количество точек', 'type': 'str', 'value': '2**14'},
+            {'name': 'Количество итераций', 'type': 'str', 'value': '2**14'},
             {'name': 'Размер точки', 'type': 'float', 'value': 1.0},
             {'name': 'Тип репера', 'type': 'int', 'value': 1},
             Parameter.create(name='Checker', type='file'),
@@ -344,7 +345,8 @@ class Application:
 
         if not rel:
             rel = float(list(self.params.child('lambda').value().replace(' ', '').split(','))[0])
-        cnt = eval(self.params.child("Количество точек").value())
+
+        cnt = safe_eval(self.params.child("Количество итераций").value())
 
         size = 1.0
         if val := self.params.child('Размер точки').value():
@@ -444,7 +446,7 @@ class Application:
         ygrid.rotate(90, 1, 0, 0)
 
         relation = self.params.child('lambda').value()
-        cnt = eval(self.params.child("Количество точек").value())
+        cnt = safe_eval(self.params.child("Количество точек").value())
 
         size = 1.0
         if val := self.params.child('Размер точки').value():
