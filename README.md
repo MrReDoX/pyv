@@ -16,8 +16,7 @@ Just do `python gui.py`. Press plot and contemplate.
 
 # Issues
 
-1. Always use plot before exporting.
-2. Formats of parameters are in the comments of appropariate methods parse_something in `gui.py`.
+1. Formats of parameters are in the comments of appropariate methods parse_something in `gui.py`.
 
 # regular $ n $-gon
 
