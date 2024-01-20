@@ -1,4 +1,5 @@
-"""Main program module. Builds GUI and run program."""
+"""Main program module. Builds GUI and run program.
+"""
 
 # TODO:
 # 1. Fix checkers messages
@@ -24,22 +25,42 @@ from seval import safe_eval
 from exporter import Exporter2D
 from iterate import Worker
 from iterate_3d import Worker3D
-from point import Point2, Point3, nPoint
+from point import Point3, nPoint
 
 
-def parse_m(data: str) -> Point2:
-    """Parse point data from text box in format (x, y)."""
+def parse_m(data: str) -> Point3:
+    """Parse point data from text box in format (x:y:z).
+
+    Args:
+        data (str): data from the text box
+
+    Returns:
+        Point3: parsed point
+    """
     if not data:
-        return Point2(inf, inf)
+        return Point3(inf, inf, inf)
 
     data = data.strip().replace(' ', '')[1:-1]
-    listed = list(map(float, data.split(',')))
+    listed = list(map(float, data.split(':')))
 
-    return Point2(listed[0], listed[1])
+    return Point3(*listed)
 
 
 def parse_vertices(data: str) -> list:
-    """Parse vertices data from text box in format "(x1:y1:z1)\n..."""
+    """Parse vertices data from text box in format
+        (x1:y1:z1)
+        (x2:y2:z2)
+            .
+            .
+            .
+        (xn:yn:zn)
+
+    Args:
+        data (str): data from the text box
+
+    Returns:
+        list: list of parsed vertices of type Point3 or nPoint
+    """
     improved_data = data.strip().replace(' ', '').replace(',', '.').split('\n')
 
     # remove ( and )
@@ -55,7 +76,14 @@ def parse_vertices(data: str) -> list:
 
 
 def parse_colors(data: str) -> list:
-    """Parse colors data from text box in format ""#HEX1, #HEX2, ..."""
+    """Parse colors data from text box in format #HEX1, #HEX2, ...
+
+    Args:
+        data (str): data from the text box
+
+    Returns:
+        list: list of strings in format ['#HEX1', '#HEX2', ...]
+    """
     if not data:
         return []
 
@@ -76,7 +104,8 @@ def parse_limits(data: str) -> Tuple[float, float, float, float]:
 
 
 class Application:
-    """Main class that build GUI."""
+    """Main class that build GUI.
+    """
 
     def __init__(self):
         pg.setConfigOptions(antialias=True)
@@ -89,7 +118,7 @@ class Application:
             Parameter.create(name='Вершины',
                              type='text',
                              value='(2:0:1)\n(4:2:1)\n(4:-2:1)'),
-            {'name': 'Стартовая точка', 'type': 'str', 'value': ''},
+            {'name': 'Стартовая точка', 'type': 'str', 'value': '(3:0:1)'},
 
             {'name': 'Цвета точек',
              'type': 'str',
@@ -113,9 +142,11 @@ class Application:
             {'name': 'Ширина границ', 'type': 'float', 'value': 1.0},
             {'name': 'Рисовать абсолют', 'type': 'bool', 'value': True},
             {'name': 'Цвет абсолюта', 'type': 'str', 'value': '#000000'},
-            {'name': 'Количество итераций', 'type': 'str', 'value': '2**14'},
+            {'name': 'Количество итераций', 'type': 'str', 'value': '2**13'},
+            # {'name': 'Количество итераций', 'type': 'str', 'value': '2'},
             {'name': 'Размер точки', 'type': 'float', 'value': 1.0},
             {'name': 'Тип репера', 'type': 'int', 'value': 1},
+            Parameter.create(name='Built-in checker', type='list'),
             Parameter.create(name='Checker', type='file'),
 
             {'name': 'Стратегия',
@@ -124,7 +155,7 @@ class Application:
         ]
 
         children_exp = [
-            {'name': 'dpi', 'type': 'int', 'value': 5000},
+            {'name': 'dpi', 'type': 'int', 'value': 500},
 
             {'name': 'Директория по умолчанию',
              'type': 'str',
@@ -148,6 +179,10 @@ class Application:
         self.params_exp = Parameter.create(name='Экспорт',
                                            type='group',
                                            children=children_exp)
+
+        self.params.child('Built-in checker').setLimits(['shapely & polygon', 'shapely', 'polygon'])
+        # self.params.child('Built-in checker').setLimits(['shapely', 'shapely & polygon', 'polygon'])
+
         param_tree = ParameterTree(showHeader=False)
         param_tree.addParameters(self.params)
         param_tree.addParameters(self.params_exp)
@@ -222,7 +257,8 @@ class Application:
         self.worker_3d = Worker3D()
 
     def read_config(self):
-        """Read GUI settings and write them to variables."""
+        """Read GUI settings and write them to variables.
+        """
         self.worker.vertices =\
             parse_vertices(self.params.child('Вершины').value())
 
@@ -294,6 +330,7 @@ class Application:
                 color = val
 
             if self.worker.frame_type == 1:
+                # Absolute is a circle
                 # Абсолют — окружность
                 points = np.linspace(0, 2 * pi, num=100)
 
@@ -304,8 +341,7 @@ class Application:
                                skipFiniteCheck=True)
 
             if self.worker.frame_type == 2:
-                # Абсолют — гипербола yx - 1 = 0
-                # 0 не содержится
+                # Absolute is a hyperbola yx-1=0
                 left = xmin - 2
                 right = xmax + 2
                 cnt = ceil(abs(right - left) / 0.01)
@@ -332,8 +368,19 @@ class Application:
                                              skipFiniteCheck=True)
                 self.canvas_2d.addItem(hyperbole)
 
+            d = {'shapely & polygon': self.worker.checker,
+                 'shapely': self.worker.shapely_default,
+                 'polygon': self.worker.polygon_default}
+
+            self.worker.checker = d[self.params.child('Built-in checker').value()]
+
     def plot_2d(self, rel=None, export_function=None):
-        """Run chaos game and plot with ScatterPlot."""
+        """Run chaos game and plot with ScatterPlot.
+
+        Args:
+            rel (_type_, optional): relation for segment division. Defaults to None.
+            export_function (_type_, optional): export right after the plot. Defaults to None.
+        """
         self.main_window.setWindowTitle('pyv PLOTTING')
         self.canvas_2d.clear()
         self.canvas_2d.addItem(self.scatter_2d)
@@ -365,7 +412,7 @@ class Application:
             if export_function:
                 export_function(x, y, colors, rel)
 
-        # run in separate thread
+        # Run in separate thread
         self.worker.args = (cnt,)
         self.worker.kwargs = {'rel': rel}
         self.worker.signals.result.connect(work_finished)
@@ -373,7 +420,8 @@ class Application:
         self.worker.threadpool.start(self.worker)
 
     def plot_3d(self):
-        """Run chaos game and plot with GLScatterPlot."""
+        """Run chaos game and plot with GLScatterPlot.
+        """
         self.main_window.setWindowTitle('pyv PLOTTING')
 
         self.graphics_widget_3d.clear()
@@ -485,7 +533,8 @@ class Application:
         self.worker_3d.threadpool.start(self.worker_3d)
 
     def export_2d(self):
-        """Export image file with matplotlib."""
+        """Export image to file with matplotlib.
+        """
         self.main_window.setWindowTitle('pyv EXPORTING')
 
         def plot_finished(x, y, colors, rel):
@@ -512,7 +561,8 @@ class Application:
         self.plot_2d(rel=relations.pop(), export_function=plot_finished)
 
     def export_3d(self):
-        """TODO."""
+        """TODO.
+        """
         filename = 'test.png'
 
         # №1
@@ -527,7 +577,8 @@ class Application:
         # matplotlib?
 
     def export_conf(self):
-        """Write current configuration to the JSON file."""
+        """Write current configuration to the JSON file.
+        """
         default_name = ''
 
         for i in self.worker.vertices:
@@ -541,7 +592,7 @@ class Application:
         filt = 'Json File (*.json)'
         path, _ = QFileDialog.getSaveFileName(
             parent=self.main_window,
-            caption='Выберите файл',
+            caption='Choose file',
             directory=os.getcwd() + f'/{default_name}',
             filter=filt,
             initialFilter=filt
@@ -560,11 +611,12 @@ class Application:
             json.dump(json_data, file, indent=4)
 
     def import_conf(self):
-        """Read parameters trees from the JSON file."""
+        """Read parameters trees from the JSON file.
+        """
         filt = 'Json File (*.json)'
         path, _ = QFileDialog.getOpenFileName(
             parent=self.main_window,
-            caption='Выберите файл',
+            caption='Choose file',
             directory=os.getcwd(),
             filter=filt,
             initialFilter=filt
@@ -580,7 +632,13 @@ class Application:
             self.params_exp.restoreState(json_data['params_exp'])
 
     def tab_changed(self, tab_widget, button_plot, button_export):
-        """Switch plot and export signals, when switch between tabs."""
+        """Switch plot and export signals, when switch between tabs.
+
+        Args:
+            tab_widget (_type_): tab we are actually on
+            button_plot (_type_): plot button
+            button_export (_type_): export button
+        """
         button_plot.disconnect()
         button_export.disconnect()
 

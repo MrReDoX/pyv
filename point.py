@@ -2,12 +2,15 @@
 
 from cmath import isfinite
 
+from utility import distance_inf, isclose_prec
+
 
 class Point2:
     """2 coordinate point."""
-    def __init__(self, new_x: float, new_y: float):
+    def __init__(self, new_x: float | complex, new_y: float | complex):
         self.x = new_x
         self.y = new_y
+        self.coords = [self.x, self.y]
 
 
     def __str__(self) -> str:
@@ -15,23 +18,49 @@ class Point2:
         return f'({self.x}, {self.y})'
 
 
+    def __iter__(self):
+        """Star syntax with point coordinates."""
+        return (self.__dict__[item] for item in list(sorted(self.__dict__))[1:])
+
+
+    def __getitem__(self, key) -> float | complex:
+        # x — 1
+        # y — 2
+
+        return self.coords[key - 1]
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Point2):
+            diffs_close = [isclose_prec(abs(self[i] - other[i]), 0) for i in range(2)]
+
+            return all(diffs_close)
+
+        return False
+
+
+
     def to_tuple(self):
+    # def to_tuple(self):
         """Return tuple of the form (x, y)."""
-        return (self.x, self.y)
+        return tuple(self.coords)
+        # return (self.x, self.y)
 
 
     def isfinite(self) -> bool:
         """Check that both coordinates are finite."""
-        return isfinite(self.x) and isfinite(self.y)
+        return all(map(isfinite, self.coords))
+        # return isfinite(self.x) and isfinite(self.y)
 
 
-    def to_point3(self, new_z: float):
+    def to_point3(self, new_z: float | complex):
         """Convert to point with 3 coordinates."""
         return Point3(self.x, self.y, new_z)
 
-    def is_complex(self):
+
+    def is_complex(self) -> bool:
         if isinstance(self.x, complex):
-            conds = [abs(t.imag) > 1e-15 for t in [self.x, self.y]]
+            conds = [not isclose_prec(abs(t.imag), 0) for t in [self.x, self.y]]
+            # conds = [abs(t.imag) > PRECISION for t in [self.x, self.y]]
 
             return any(conds)
 
@@ -48,10 +77,11 @@ class Point2:
 
 class Point3:
     """3 coordinate point."""
-    def __init__(self, new_x: float, new_y: float, new_z: float):
+    def __init__(self, new_x: float | complex, new_y: float | complex, new_z: float | complex):
         self.x = new_x
         self.y = new_y
         self.z = new_z
+        self.coords = [self.x, self.y, self.z]
 
 
     def __str__(self) -> str:
@@ -61,17 +91,33 @@ class Point3:
 
     def __iter__(self):
         """Star syntax with point coordinates."""
-        return (self.__dict__[item] for item in sorted(self.__dict__))
+        return (self.__dict__[item] for item in list(sorted(self.__dict__))[1:])
+
+
+    def __getitem__(self, key) -> float | complex:
+        # x — 1
+        # y — 2
+        # z — 3
+        return self.coords[key - 1]
+
+
+    def __eq__(self, other):
+        if isinstance(other, Point3):
+            return distance_inf(self, other)
+
+        return False
 
 
     def to_tuple(self):
         """Return tuple of the form (x, y, z)."""
-        return (self.x, self.y, self.z)
+        return tuple(self.coords)
+        # return (self.x, self.y, self.z)
 
 
     def isfinite(self) -> bool:
         """Check that all coordinates are finite."""
-        return isfinite(self.x) and isfinite(self.y) and isfinite(self.z)
+        return all(map(isfinite, self.coords))
+        # return isfinite(self.x) and isfinite(self.y) and isfinite(self.z)
 
 
     def to_point2(self) -> Point2:
@@ -95,7 +141,7 @@ class nPoint:
         self.n = len(new_coords)
 
     def __str__(self) -> str:
-        """Return string of the form (v_1, v_2, \ldots, v_n)."""
+        """Return string of the form (v_1, v_2, \\ldots, v_n)."""
         return '(' + ', '.join(map(str, self.v)) + ')'
 
     def __getitem__(self, key):
@@ -107,11 +153,11 @@ class nPoint:
         self.v[key] = value
 
     def to_tuple(self):
-        """Return tuple of the form (v_1, v_2, \ldots, v_n)."""
+        """Return tuple of the form (v_1, v_2, \\ldots, v_n)."""
         return tuple(i for i in self.v)
 
     def to_list(self):
-        """Return list of the form [v_1, v_2, \ldots, v_n]."""
+        """Return list of the form [v_1, v_2, \\ldots, v_n]."""
         return self.v
 
     def isfinite(self) -> bool:

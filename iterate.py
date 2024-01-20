@@ -11,8 +11,11 @@ from pyqtgraph.Qt.QtCore import (QObject, QRunnable, QThreadPool, pyqtSignal,
 from shapely.geometry import Point, Polygon
 from shapely.prepared import prep
 
+from constants import PRECISION
+from geometry import Line
 from point import Point2, Point3
-from utility import PRECISION, harmonic, line_intersection, u1, u2, u3
+from special_functions import harmonic, phi, phi_bar, phi_big, u1, u2, u3
+from utility import isclose_prec, signum
 
 
 class WorkerSignals(QObject):
@@ -29,7 +32,8 @@ class WorkerSignals(QObject):
 
 
 class Worker(QRunnable):
-    """Main class that «plays» chaos game with settings."""
+    """Main class that «plays» chaos game with settings.
+    """
 
     def __init__(self):
         # For threading
@@ -39,13 +43,14 @@ class Worker(QRunnable):
         self.kwargs = {}
         self.signals = WorkerSignals()
 
-        self.start_point = Point2(0.0, 0.0)
-        self._vertices = []
-        self.checker = self.shapely_default
+        self.start_point = Point3(0, 0, 1)
+        self._vertices: List[Point3] = []
+        # self.checker = self.shapely_default
+        # self.checker = self.polygon_default
+        self.checker = lambda p: self.shapely_default(p) and self.polygon_default(p)
         self.strategy = lambda verticies, prev: choice(verticies)
         self.vertices_colors = []
         self.double_mid = False
-        self.projective = 1
         self.frame_type = 2
 
         self.precision = PRECISION
@@ -59,26 +64,47 @@ class Worker(QRunnable):
 
     @property
     def vertices(self) -> list:
-        """Getter for vertices of triangle, rectangle etc."""
+        """Getter for vertices of triangle, rectangle etc.
+        """
         return self._vertices
 
     @property
     def colors(self) -> list:
-        """Getter for colors of chaos game points."""
+        """Getter for colors of points.
+        """
         return list(self._colors)
 
     @vertices.setter
-    def vertices(self, value):
-        """Setter for vertices. Builds shapely polygon when points are set."""
+    def vertices(self, value) -> List[Point3]:
+        """Setter for vertices. Builds  shapely polygon when points are set. Computes sings for polygon_default method
+
+        Args:
+            value (List[Point3]): self._vertices = value
+        """
         self._vertices = value
 
-        pairs = [(i.to_point2().x, i.to_point2().y) for i in self.vertices]
+        vertices_2d = [i.to_point2().to_float() for i in self._vertices]
 
-        self.poly = Polygon(pairs)
+        pairs = [i.to_tuple() for i in vertices_2d]
+
+        # self.poly = Polygon(pairs)
+        self.poly = Polygon(pairs).buffer(0.1, quad_segs=2**7)
         self.poly_prep = prep(self.poly)
 
+        vertices_2d += [vertices_2d[0]]
+        vertices_zipped = zip(vertices_2d, vertices_2d[1:])
+
+        self.equations = [Line(a, b).equation
+                          for a, b in vertices_zipped]
+
+        point_inside = self.gen_start_point().to_point2()
+
+        self.signs = [signum(f(point_inside.x, point_inside.y))for f in self.equations]
+
+
     def gen_random_colors(self) -> list:
-        """Generating random colors in format #123456 for each vertex."""
+        """Generating random colors in format #123456 for each vertex.
+        """
         data = '0123456789ABCDEF'
 
         answer = ['#' + ''.join([choice(data) for j in range(6)])
@@ -86,26 +112,69 @@ class Worker(QRunnable):
 
         return answer
 
-    def shapely_default(self, point: Point2) -> bool:
-        """Use built-in shapely method to check that points fit."""
-        return self.poly_prep.contains(Point(point.x, point.y))
 
-    def gen_start_point(self) -> Point2:
-        """Randomly choose starting point."""
+    def shapely_default(self, point: Point3) -> bool:
+        """Use built-in shapely method to check that points fit
+
+        Args:
+            point (Point3): point to check
+
+        Returns:
+            bool: point \\in Polygon?
+        """
+        cur = point.to_point2().to_float()
+
+        return self.poly_prep.contains(Point(cur.x, cur.y))
+
+
+    def polygon_default(self, point: Point3) -> bool:
+        """Use fact that we have polygon. Point signs in line equations should
+           be the same as starting point.
+
+        Args:
+            point (Point3): point to check
+
+        Returns:
+            bool: point \\in Polygon?
+        """
+        cur = point.to_point2().to_float()
+
+        for idx, f in enumerate(self.equations):
+            cur_sign = signum(f(cur.x, cur.y))
+
+            if abs(cur_sign) > 0 and cur_sign != self.signs[idx]:
+                return False
+
+        return True
+
+
+    def gen_start_point(self) -> Point3:
+        """Randomly choose starting point using shapely polygon bounds method.
+
+        Returns:
+            Point3: random point inside
+        """
         minx, miny, maxx, maxy = self.poly.bounds
 
         x = uniform(minx, maxx)
         y = uniform(miny, maxy)
 
         # Point is from shapely.geometry
-        while not self.poly_prep.contains(Point(x, y)):
+        while not self.shapely_default(Point3(x,  y, 1)):
             x = uniform(minx, maxx)
             y = uniform(miny, maxy)
 
-        return Point2(x, y)
+        return Point3(x, y, 1)
 
     def guess_limits(self, contains_absolute=False) -> Tuple[float, float, float, float]:
-        """Try to guess x and y limits for picture."""
+        """Fit polygon and maybe absolute to screen
+
+        Args:
+            contains_absolute (bool, optional): consider absolute. Defaults to False.
+
+        Returns:
+            Tuple[float, float, float, float]: xmin, xmax, ymin, ymax for plotter
+        """
         xmin, ymin = inf, inf
         xmax, ymax = -inf, -inf
 
@@ -132,158 +201,147 @@ class Worker(QRunnable):
         return xmin, xmax, ymin, ymax
 
     def div_in_rel(self,
-                   vertex: Point3,
-                   cur: Point3,
+                   m: Point3,
+                   b: Point3,
                    rel=1,
-                   inside=True) -> Point2:
-        """Main method that divides «segment» in appropriate relation."""
+                   inside=True) -> Point3:
+        """Main method that divides «segment» in appropriate relation.
+
+        Args:
+            m (Point3): _description_
+            b (Point3): _description_
+            rel (int, optional): relation for segment division. Defaults to 1.
+            inside (bool, optional): double middle plotting. Defaults to True.
+
+        Returns:
+            Point3: division result
+        """
 
         from mid_first_lambda import coord
-        val = u1(vertex, cur)**2 + u2(vertex, cur)**2 - u3(vertex, cur)**2
-        scal = vertex.x * cur.x + vertex.y * cur.y - vertex.z - cur.z
 
-        conds = [isclose(abs(val), 0, rel_tol=self.precision),
-                 isclose(abs(scal), 0, rel_tol=self.precision),
-                 val > 0]
-        if all(conds):
-            p1 = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
-                        coord(2, vertex, cur, 1 / (1 + rel)),
-                        coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
+        val = phi_big(m, b)
 
-            p2 = Point3(coord(1, vertex, cur, -1 / (1 + rel)),
-                        coord(2, vertex, cur, -1 / (1 + rel)),
-                        coord(3, vertex, cur, -1 / (1 + rel))).to_point2().to_float()
+        if val > 0:
+            mu = rel / (1 + rel)
 
-            if not p1.isfinite() and not p2.isfinite():
-                return Point2(inf, inf)
-
-            if self.checker(p1) == inside:
-                return p1
-
-            if self.checker(p2) == inside:
-                return p2
-
-            return Point2(inf, inf)
-
-        if isclose(abs(val), 0, rel_tol=self.precision):
+            return Point3(coord(1, m, b, mu),
+                          coord(2, m, b, mu),
+                          coord(3, m, b, mu))
+        elif isclose_prec(abs(val), 0):
             from mid_first_lambda_parabolic import coord
 
-            ans = Point3(coord(1, vertex, cur, rel),
-                         coord(2, vertex, cur, rel),
-                         coord(3, vertex, cur, rel)).to_point2().to_float()
+            return Point3(coord(1, m, b, rel),
+                          coord(2, m, b, rel),
+                          coord(3, m, b, rel))
 
-            if not ans.isfinite():
-                return Point2(inf, inf)
+        # val < 0
+        if isclose_prec(abs(phi_bar(m, b)), 0):
+            mu = rel / (1 + rel)
 
-            return ans
-        if val > 0:
-            ans = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
-                         coord(2, vertex, cur, 1 / (1 + rel)),
-                         coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
+            c1 = Point3(coord(1, m, b, mu),
+                        coord(2, m, b, mu),
+                        coord(3, m, b, mu))
 
-            if not ans.isfinite():
-                return Point2(inf, inf)
+            mu = -rel / (1 + rel)
 
-            return ans
+            c2 = Point3(coord(1, m, b, mu),
+                        coord(2, m, b, mu),
+                        coord(3, m, b, mu))
 
-        vertices_2d = [i.to_point2() for i in self._vertices]
+            if self.checker(c1) == inside:
+                return c1
+
+            return c2
+
+        # phi_bar(m, b) \neq 0
+        vertices_2d = [i.to_point2().to_float() for i in self._vertices]
         vertices_2d += [vertices_2d[0]]
-        vertices_zipped = zip(vertices_2d, vertices_2d[1:])
+        vertices2d_zipped = zip(vertices_2d, vertices_2d[1:])
 
         h_points = []
-        for bi, bj in vertices_zipped:
-            vertex_2d = vertex.to_point2()
-            cur_2d = cur.to_point2()
+        for bi, bj in vertices2d_zipped:
+            line_m_b = Line(m.to_point2().to_float(),
+                            b.to_point2().to_float())
 
-            h_points.append(line_intersection(bi.x, bi.y,
-                                              bj.x, bj.y,
-                                              vertex_2d.x, vertex_2d.y,
-                                              cur_2d.x, cur_2d.y))
+            result = line_m_b.intersect(Line(bi, bj))
 
-        h_points = list(filter(lambda t: t.isfinite() and t != vertex, h_points))
+            if result not in self.vertices:
+                h_points.append(result.to_point3(1))
 
-        h = h_points.pop()
+        # Almost surely h_points is empty after this. Don't know correct solution.
+        # See work method.
+        # if len(h_points) > 1:
+        #     h_points = list(filter(self.polygon_default, h_points))
 
-        u_1 = u1(vertex, cur)
-        u_2 = u2(vertex, cur)
-        u_3 = u3(vertex, cur)
+        if not h_points:
+            return Point3(inf, inf, inf)
 
-        vertex_star = Point3(-vertex.y * u_3 - vertex.z * u_2,
-                             vertex.x * u_3 + vertex.z * u_1,
-                             vertex.y * u_1 - vertex.x * u_2)
+        h: Point3 = choice(h_points)
 
-        if harmonic(cur, vertex, h, vertex_star) > 0:
-            ans = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
-                         coord(2, vertex, cur, 1 / (1 + rel)),
-                         coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
+        b_star = Point3(-b[2] * u3(m, b) - b[3] * u2(m, b),
+                        b[1] * u3(m, b) + b[3] * u1(m, b),
+                        b[2] * u1(m, b) - b[1] * u2(m, b))
 
-            good_conds = [ans.isfinite(), self.checker(ans) == inside]
+        if harmonic(m, b, h, b_star).real > 0:
+            mu = rel / (1 + rel)
 
-            if not all(good_conds):
-                return Point2(inf, inf)
+            return Point3(coord(1, m, b, mu),
+                          coord(2, m, b, mu),
+                          coord(3, m, b, mu))
 
-            return ans
+        # Due to precision errors this sometimes doesn't work
+        try:
+            angle = acos(abs(phi_bar(m, b)) / (sqrt(phi(m)) * sqrt(phi(b))))
+        except ValueError:
+            return Point3(inf, inf, inf)
 
-        vertex_phi = sqrt(vertex.x**2 + vertex.y**2 - vertex.z**2)
-        cur_phi = sqrt(cur.x**2 + cur.y**2 - cur.z**2)
+        m_star = Point3(-m[2] * u3(m, b) - m[3] * u2(m, b),
+                        m[1] * u3(m, b) + m[3] * u1(m, b),
+                        m[2] * u1(m, b) - m[1] * u2(m, b))
 
-        phi = acos(abs(scal) / (vertex_phi * cur_phi))
+        if isclose(rel, pi / (pi - 2 * angle)):
+            return self.div_in_rel(m_star, b, rel, inside)
 
-        if isclose(rel, (pi - 2 * phi) / pi, rel_tol=1e-15):
-            return vertex_star.to_point2().to_float()
+        if rel < (pi - 2 * angle) / pi:
+            mu = (2 * rel * (pi - angle)) / ((1 + rel) * (pi - 2 * angle))
 
-        if isclose(rel, pi / (pi - 2 * phi), rel_tol=1e-15):
-            cur_star = Point3(-cur.y * u_3 - cur.z * u_2,
-                              cur.x * u_3 + cur.z * u_1,
-                              cur.y * u_1 - cur.x * u_2)
+            return Point3(coord(1, m, b_star, mu),
+                          coord(2, m, b_star, mu),
+                          coord(3, m, b_star, mu))
 
-            return cur_star.to_point2().to_float()
+        if (pi - 2 * angle) / pi < rel < pi / (pi - 2 * angle):
+            mu = (2 * angle + pi * (rel - 1)) / (2 * angle * (rel + 1))
 
-        if rel < (pi - 2 * phi) / pi:
-            ans = Point3(coord(1, vertex, cur, (1 + 2 * rel) / (1 + rel)),
-                         coord(2, vertex, cur, (1 + 2 * rel) / (1 + rel)),
-                         coord(3, vertex, cur, (1 + 2 * rel) / (1 + rel))).to_point2().to_float()
+            return Point3(coord(1, b_star, m_star, mu),
+                          coord(2, b_star, m_star, mu),
+                          coord(3, b_star, m_star, mu))
 
-            good_conds = [ans.isfinite(), self.checker(ans) == inside]
+        # rel > pi / (pi - 2 * angle):
+        mu = (pi * (rel - 1) - 2 * rel * angle) / ((1 + rel) * (pi - 2 * angle))
 
-            if not all(good_conds):
-                return Point2(inf, inf)
-
-            return ans
-
-        if (pi - 2 * phi) / pi < rel < pi / (pi - 2 * phi):
-            ans = Point3(coord(1, vertex, cur, 1 / (1 + rel)),
-                         coord(2, vertex, cur, 1 / (1 + rel)),
-                         coord(3, vertex, cur, 1 / (1 + rel))).to_point2().to_float()
-
-            good_conds = [ans.isfinite(), self.checker(ans) == inside]
-
-            if not all(good_conds):
-                return Point2(inf, inf)
-
-            return ans
-
-        ans = Point3(coord(1, vertex, cur, -1 / (1 + rel)),
-                     coord(2, vertex, cur, -1 / (1 + rel)),
-                     coord(3, vertex, cur, -1 / (1 + rel))).to_point2().to_float()
-
-        good_conds = [ans.isfinite(), self.checker(ans) == inside]
-
-        if not all(good_conds):
-            return Point2(inf, inf)
-
-        return ans
+        return Point3(coord(1, m_star, b, mu),
+                      coord(2, m_star, b, mu),
+                      coord(3, m_star, b, mu))
 
     @pyqtSlot()
     def run(self):
-        """Method that runs when thread starts."""
+        """Method that runs when thread starts.
+        """
         x, y, colors = self.work(*self.args, **self.kwargs)
 
         self.signals.result.emit(x, y, colors)
 
     def work(self, cnt: int, rel=1):
-        """Main method that «plays» chaos game."""
-        def add_point(point, x, y, vert=None, colors=None):
+        """Main method that «plays» chaos game.
+        """
+        def add_point(point: Point2,
+                      x: List[float],
+                      y: List[float],
+                      vert,
+                      colors) -> bool:
+            # bounds = cur.isfinite()\
+            #          and self.xmin <= point.x <= self.xmax\
+            #          and self.ymin <= point.y <= self.ymax
             bounds = point.isfinite()\
                      and self.xmin <= point.x <= self.xmax\
                      and self.ymin <= point.y <= self.ymax
@@ -301,37 +359,51 @@ class Worker(QRunnable):
         y_coords: List[float] = []
         colors: List[str] = []
 
-        prev = []
-        cur = self.start_point.to_point3(self.projective)
+        prev: List[Point3] = []
+        cur: Point2 = self.start_point.to_point2()
 
         print(cur)
 
         for _ in range(cnt):
-            vertex = self.strategy(self.vertices, prev)
-            prev.append(vertex)
+            b: Point3 = self.strategy(self.vertices, prev)
+            m = self.div_in_rel(cur.to_point3(1), b, rel=rel)
 
-            result = self.div_in_rel(vertex, cur, rel=rel)
+            if not self.checker(m):
+                print(f'bad')
+                continue
 
-            if add_point(result,
+            m = m.to_point2().to_float()
+
+            if add_point(m,
                          x_coords,
                          y_coords,
-                         vert=vertex,
+                         vert=b,
                          colors=colors):
-                cur = result.to_point3(self.projective)
+                prev.append(b)
+                cur = m
 
-            if self.double_mid:
-                for val in [rel, -rel]:
-                    out = self.div_in_rel(vertex, cur, rel=val, inside=False)
-                    add_point(out,
-                              x_coords,
-                              y_coords,
-                              vert=vertex,
-                              colors=colors)
+            # if self.double_mid:
+            #     for val in [rel, -rel]:
+            #         out = self.div_in_rel(b, cur, rel=val, inside=False)
+            #         add_point(out,
+            #                   x_coords,
+            #                   y_coords,
+            #                   vert=b,
+            #                   colors=colors)
 
         return np.array(x_coords), np.array(y_coords), np.array(colors)
 
     def clean(self, x, y, colors):
-        """Take quotient of points by current precision."""
+        """Take quotient of points by digits parameter.
+
+        Args:
+            x (List[float]): x's coordinates
+            y (List[float]): y's coordinates
+            colors (List[str]): color of every point
+
+        Returns:
+            tuple[List[float], List[float], List[str]]: result of cleaning
+        """
         x = np.round(x, decimals=self.decimals)
         y = np.round(y, decimals=self.decimals)
 
