@@ -1,0 +1,137 @@
+{
+    "Параметры": [
+        {
+            "name": "Вершины",
+            "type": "text",
+            "value": "(2:0:1)\n(4:2:1)\n(4:-2:1)"
+        },
+        {
+            "name": "Стартовая точка",
+            "type": "str",
+            "value": "(3:0:1)"
+        },
+        {
+            "name": "Цвета точек",
+            "type": "str",
+            "value": "#00406b, #008000, #781f19"
+        },
+        {
+            "name": "Случайные цвета",
+            "type": "bool",
+            "value": false
+        },
+        {
+            "name": "lambda",
+            "type": "str",
+            "value": "1.0"
+        },
+        {
+            "name": "Рисовать точки внутри",
+            "type": "bool",
+            "value": true
+        },
+        {
+            "name": "Пределы",
+            "type": "str",
+            "value": ""
+        },
+        {
+            "name": "Угадывать пределы",
+            "type": "bool",
+            "value": false
+        },
+        {
+            "name": "Угадывать пределы (включить абсолют)",
+            "type": "bool",
+            "value": true
+        },
+        {
+            "name": "Рисовать границы",
+            "type": "bool",
+            "value": true
+        },
+        {
+            "name": "Ширина границ",
+            "type": "float",
+            "value": 1.0
+        },
+        {
+            "name": "Рисовать абсолют",
+            "type": "bool",
+            "value": true
+        },
+        {
+            "name": "Цвет абсолюта",
+            "type": "str",
+            "value": "#000000"
+        },
+        {
+            "name": "Количество итераций",
+            "type": "str",
+            "value": "2**13"
+        },
+        {
+            "name": "Размер точки",
+            "type": "float",
+            "value": 1.0
+        },
+        {
+            "name": "Тип репера",
+            "type": "int",
+            "value": 1
+        },
+        {
+          "name": "Алгоритм",
+          "type": "list",
+          "limits": ["shapely & polygon", "shapely", "polygon"]
+        },
+        {
+            "name": "Стратегия",
+            "type": "str",
+            "value": "./strategies/default.py"
+        }
+    ],
+
+    "Экспорт": [
+        {
+            "name": "dpi",
+            "type": "int",
+            "value": 500
+        },
+        {
+            "name": "Директория по умолчанию",
+            "type": "str",
+            "value": ""
+        },
+        {
+            "name": "Ширина линий абсолюта",
+            "type": "float",
+            "value": 0.25
+        },
+        {
+            "name": "Ширина границ",
+            "type": "float",
+            "value": 0.25
+        },
+        {
+            "name": "Размер точки",
+            "type": "float",
+            "value": 0.25
+        },
+        {
+            "name": "Рисовать оси",
+            "type": "bool",
+            "value": true
+        },
+        {
+            "name": "Растеризовать",
+            "type": "bool",
+            "value": true
+        },
+        {
+            "name": "Имя файла",
+            "type": "str",
+            "value": "$color$_$lambda$_$verticies$.eps"
+        }
+    ]
+}
