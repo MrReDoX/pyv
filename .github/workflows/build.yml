@@ -1,0 +1,32 @@
+name: Build Test
+
+on: [push, pull_request]
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: pip install uv
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Test imports
+      run: |
+        uv run python -c "import sys; print('Python:', sys.version)"
+        uv run python -c "from src.Gui import main; print('Import OK')"
+
+    - name: Build test (no upload)
+      run: |
+        uv add pyinstaller
+        uv run pyinstaller src/Gui.py --onefile --windowed --name pyv-test
+        echo "Build successful!"

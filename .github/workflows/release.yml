@@ -1,0 +1,93 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Например: v1.0.0, v1.2.3
+  workflow_dispatch:  # Разрешает ручной запуск
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: pip install uv
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Install PyInstaller
+      run: uv add pyinstaller
+
+    - name: Build executable
+      shell: bash
+      run: |
+        # Windows
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          uv run pyinstaller src/Gui.py --onefile --windowed --name pyv-windows --icon=pyv.png
+          # Убедимся что файл правильно назван
+          mv dist/pyv-windows.exe dist/pyv-windows-x64.exe 2>/dev/null || true
+
+        # Linux
+        elif [ "$RUNNER_OS" = "Linux" ]; then
+          uv run pyinstaller src/Gui.py --onefile --name pyv-linux
+          mv dist/pyv-linux dist/pyv-linux-x64
+          chmod +x dist/pyv-linux-x64
+
+        # macOS
+        else
+          uv run pyinstaller src/Gui.py --onefile --name pyv-mac
+          mv dist/pyv-mac dist/pyv-mac-x64
+          chmod +x dist/pyv-mac-x64
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pyv-${{ matrix.os }}
+        path: dist/
+        if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: List generated files
+      run: |
+        echo "Generated files:"
+        find ./artifacts -type f -name "pyv-*" | sort
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          artifacts/pyv-windows-latest/pyv-windows-x64.exe
+          artifacts/pyv-ubuntu-latest/pyv-linux-x64
+          artifacts/pyv-macos-latest/pyv-mac-x64
