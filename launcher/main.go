@@ -121,9 +121,15 @@ func unzipUV() error {
 // Скачивает репозиторий
 func downloadPyv() error {
 	filename := "pyv-master.zip"
+	destDir := "pyv"
 	url := "https://github.com/MrReDoX/pyv/archive/refs/heads/master.zip"
 
-	// Проверяем, не скачан ли уже
+	// Если папка pyv уже существует - пропускаем скачивание
+	if _, err := os.Stat(destDir); err == nil {
+		fmt.Printf("✓ Папка %s уже существует, пропускаем скачивание\n", destDir)
+		return nil
+	}
+
 	if _, err := os.Stat(filename); err == nil {
 		fmt.Printf("✓ %s уже существует\n", filename)
 		return nil
@@ -160,8 +166,11 @@ func unzipPyv() error {
 	zipFile := "pyv-master.zip"
 	destDir := "pyv"
 
-	// Удаляем старую директорию если есть
-	os.RemoveAll(destDir)
+	// Если папка уже существует - пропускаем распаковку
+	if _, err := os.Stat(destDir); err == nil {
+		fmt.Printf("✓ Папка %s уже существует, пропускаем распаковку\n", destDir)
+		return nil
+	}
 
 	// Открываем архив
 	r, err := zip.OpenReader(zipFile)
@@ -226,23 +235,52 @@ func unzipPyv() error {
 
 func runPyv() error {
 	fmt.Println("🚀 Запускаем PyV...")
-	_ = os.Remove("pyv/uv.exe")
-	data, err := os.ReadFile("uv/uv.exe")
-	if err != nil {
+
+	// Копируем uv.exe только если его нет в pyv
+	if _, err := os.Stat("pyv/uv.exe"); os.IsNotExist(err) {
+		fmt.Println("📁 Копируем uv.exe в папку pyv...")
+		data, err := os.ReadFile("uv/uv.exe")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile("pyv/uv.exe", data, 0755); err != nil {
+			return err
+		}
+		fmt.Println("✅ uv.exe скопирован")
+	} else if err != nil {
 		return err
+	} else {
+		fmt.Println("✓ uv.exe уже существует в папке pyv")
 	}
-	os.WriteFile("pyv/uv.exe", data, 0755)
 
 	originalDir, _ := os.Getwd()
 	defer os.Chdir(originalDir)
 	os.Chdir("pyv")
 
-	fmt.Println("📦 Устанавливаем зависимости...")
-	cmdSync := exec.Command(".\\uv.exe", "sync", "--active")
-	cmdSync.Stdout = os.Stdout
-	cmdSync.Stderr = os.Stderr
-	if err := cmdSync.Run(); err != nil {
-		return fmt.Errorf("ошибка uv sync: %w", err)
+	// Проверяем, установлены ли уже зависимости (есть ли venv папка)
+	// В PyV зависимости обычно в .venv или venv
+	venvExists := false
+	if _, err := os.Stat(".venv"); err == nil {
+		venvExists = true
+	}
+	if _, err := os.Stat("venv"); err == nil {
+		venvExists = true
+	}
+	if _, err := os.Stat("pyproject.toml"); err != nil && !venvExists {
+		// Если нет pyproject.toml и нет venv - что-то не так
+		return fmt.Errorf("pyproject.toml не найден")
+	}
+
+	if !venvExists {
+		fmt.Println("📦 Устанавливаем зависимости...")
+		cmdSync := exec.Command(".\\uv.exe", "sync", "--active")
+		cmdSync.Stdout = os.Stdout
+		cmdSync.Stderr = os.Stderr
+		if err := cmdSync.Run(); err != nil {
+			return fmt.Errorf("ошибка uv sync: %w", err)
+		}
+	} else {
+		fmt.Println("✓ Зависимости уже установлены")
 	}
 
 	fmt.Println("🎬 Запускаем PyV в фоне...")
@@ -273,11 +311,32 @@ func runPyv() error {
 }
 
 func main() {
-	check(downloadUV(), "скачивание uv")
-	check(unzipUV(), "uv.exe распакован")
-	check(downloadPyv(), "репозиторий скачан")
-	check(unzipPyv(), "репозиторий распакован")
+	// Сначала проверяем, есть ли уже все необходимое
+	if _, err := os.Stat("uv/uv.exe"); err == nil {
+		fmt.Println("✓ uv.exe уже установлен")
+	} else {
+		// Только если нет uv.exe - качаем
+		check(downloadUV(), "скачивание uv")
+		check(unzipUV(), "uv.exe распакован")
+	}
 
+	if _, err := os.Stat("pyv"); err == nil {
+		fmt.Println("✓ pyv уже установлен")
+	} else {
+		// Только если нет папки pyv - качаем
+		check(downloadPyv(), "репозиторий скачан")
+		check(unzipPyv(), "репозиторий распакован")
+	}
+
+	// Проверяем, есть ли uv.exe в pyv
+	if _, err := os.Stat("pyv/uv.exe"); os.IsNotExist(err) {
+		fmt.Println("📁 Копируем uv.exe в папку pyv...")
+		data, err := os.ReadFile("uv/uv.exe")
+		check(err, "чтение uv.exe")
+		check(os.WriteFile("pyv/uv.exe", data, 0755), "копирование uv.exe")
+	}
+
+	// Запускаем PyV
 	if err := runPyv(); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ запуск pyv: %v\n", err)
 		fmt.Println("Нажмите Enter для выхода...")
