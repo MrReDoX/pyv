@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# В корне проекта (не в launcher/)
+launcher/*
+!launcher/go.mod
+!launcher/main.go
+!launcher/build.bat
