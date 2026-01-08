@@ -24,9 +24,9 @@ Press "Plot" and contemplate.
 
 1. Formats of parameters are in the comments of appropariate methods parse_something in `gui.py`.
 
-# regular $ n $-gon
+# regular $n$-gon
 
-Build regular $ n $-gon with center in $ c $ and radius $ r $
+Build regular $n$-gon with center in $c$ and radius $r$
 
 ```python
 from cmath import exp
